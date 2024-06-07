@@ -4,7 +4,6 @@ import uuid
 import csv
 import biothings_client
 from collections.abc import Iterator
-import itertools
 
 """
 column names with index: {0: 'id', 1: 'g_micro', 2: 'organism', 3: 'g_meta', 4: 'metabolic', 5: 'pubchem_compound', 6: 'pubchem_id', 7: 'formula', 8: 'kegg_id', 9: 'tax_id', 10: 'phylum', 11: 'class', 12: 'order', 13: 'family', 14: 'genus', 15: 'species', 16: 'species_id', 17: 'source', 18: 'smiles_sequence', 19: 'HMDBID', 20: 'Origin'}
@@ -106,14 +105,16 @@ def load_micro_meta_data():
     file_path = os.path.join(path, "data", "micro_metabolic.csv")
     assert os.path.exists(file_path), f"The file {file_path} does not exist."
 
-    docs = get_nodes(file_path)
-    for doc in docs:
-        yield doc
+    recs = get_nodes(file_path)
+    for rec in recs:
+        yield rec
 
 
 if __name__ == "__main__":
     micro_meta_data = load_micro_meta_data()
+    _ids = []
     for obj in micro_meta_data:
-        print(obj)
-
+        _ids.append(obj["_id"])
+    print(f"total records: {len(_ids)}")
+    print(f"total records with no duplications: {len(set(_ids))}")
 
