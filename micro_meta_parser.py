@@ -1,8 +1,6 @@
 import os
-import time
 import uuid
 
-import pandas as pd
 import csv
 import biothings_client
 from collections.abc import Iterator
@@ -25,28 +23,31 @@ def line_generator(file_path):
             yield row
 
 
+def assign_col_val_if_available(node, key, val, transform=None):
+    if val and val != "not available":
+        node[key] = transform(val) if transform else val
+
+
 for ls in line_generator(file_path):
     object_node = {
         "id": None,
-        "name": ls[5]
+        "name": ls[5].lower()
     }
-    if ls[6] and ls[6] == "not available":
-        if ls[8] and ls[8] != "not available":
-            object_node["id"] = f"KEGG.COMPOUND:{ls[8]}"
-            object_node["kegg"] = ls[8]
-        elif ls[19] and ls[19] != "not available":
-            object_node["id"] = f"HMDB:{ls[19]}"
-            object_node["hmdb"] = ls[19]
-        else:
-            object_node["id"] = int(uuid.uuid4())
-    else:
-        object_node["id"] = f"PUBCHEM.COMPOUND:{int(ls[6])}"
-        object_node["pubchem_cid"] = int(ls[6])
 
-    if ls[7] and ls[7] != "not available":
-        object_node["chemical_formula"] = ls[7]
-    if ls[18] and ls[18] != "not available":
-        object_node["smiles"] = ls[18]
+    assign_col_val_if_available(object_node, "pubchem_cid", ls[6], int)
+    assign_col_val_if_available(object_node, "kegg", ls[8])
+    assign_col_val_if_available(object_node, "hmdb", ls[19])
+    assign_col_val_if_available(object_node, "chemical_formula", ls[7])
+    assign_col_val_if_available(object_node, "smiles", ls[18])
+
+    if "pubchem_cid" in object_node:
+        object_node["id"] = f"PUBCHEM.COMPOUND:{object_node['pubchem_cid']}"
+    elif "kegg" in object_node:
+        object_node["id"] = f"KEGG.COMPOUND:{object_node['kegg']}"
+    elif "hmdb" in object_node:
+        object_node["id"] = f"HMDB:{object_node['hmdb']}"
+    else:
+        object_node["id"] = str(uuid.uuid4())
 
     print(object_node)
 
