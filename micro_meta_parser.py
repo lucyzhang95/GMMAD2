@@ -168,19 +168,17 @@ def load_micro_meta_data():
             yield rec
 
 
-if __name__ == "__main__":
-    from collections import Counter
+# if __name__ == "__main__":
+# from collections import Counter
+# micro_meta_data = load_micro_meta_data()
+# type_list = [obj["subject"]["type"] for obj in micro_meta_data]
+# type_counts = Counter(type_list)
+# for value, count in type_counts.items():
+#     print(f"{value}: {count}")
 
-    micro_meta_data = load_micro_meta_data()
-
-    type_list = [obj["subject"]["type"] for obj in micro_meta_data]
-    type_counts = Counter(type_list)
-    for value, count in type_counts.items():
-        print(f"{value}: {count}")
-
-    # _ids = []
-    # for obj in micro_meta_data:
-    #     print(obj)
-    #     _ids.append(obj["_id"])
-    # print(f"total records: {len(_ids)}")
-    # print(f"total records with no duplications: {len(set(_ids))}")
+# _ids = []
+# for obj in micro_meta_data:
+#     print(obj)
+#     _ids.append(obj["_id"])
+# print(f"total records: {len(_ids)}")
+# print(f"total records with no duplications: {len(set(_ids))}")
