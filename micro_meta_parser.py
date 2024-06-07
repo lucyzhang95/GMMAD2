@@ -28,28 +28,31 @@ def assign_col_val_if_available(node, key, val, transform=None):
         node[key] = transform(val) if transform else val
 
 
-for ls in line_generator(file_path):
-    object_node = {
-        "id": None,
-        "name": ls[5].lower()
-    }
+def create_object_node():
+    for ls in line_generator(file_path):
+        object_node = {
+            "id": None,
+            "name": ls[5].lower()
+        }
 
-    assign_col_val_if_available(object_node, "pubchem_cid", ls[6], int)
-    assign_col_val_if_available(object_node, "kegg", ls[8])
-    assign_col_val_if_available(object_node, "hmdb", ls[19])
-    assign_col_val_if_available(object_node, "chemical_formula", ls[7])
-    assign_col_val_if_available(object_node, "smiles", ls[18])
+        assign_col_val_if_available(object_node, "pubchem_cid", ls[6], int)
+        assign_col_val_if_available(object_node, "kegg", ls[8])
+        assign_col_val_if_available(object_node, "hmdb", ls[19])
+        assign_col_val_if_available(object_node, "chemical_formula", ls[7])
+        assign_col_val_if_available(object_node, "smiles", ls[18])
 
-    if "pubchem_cid" in object_node:
-        object_node["id"] = f"PUBCHEM.COMPOUND:{object_node['pubchem_cid']}"
-    elif "kegg" in object_node:
-        object_node["id"] = f"KEGG.COMPOUND:{object_node['kegg']}"
-    elif "hmdb" in object_node:
-        object_node["id"] = f"HMDB:{object_node['hmdb']}"
-    else:
-        object_node["id"] = str(uuid.uuid4())
+        if "pubchem_cid" in object_node:
+            object_node["id"] = f"PUBCHEM.COMPOUND:{object_node['pubchem_cid']}"
+        elif "kegg" in object_node:
+            object_node["id"] = f"KEGG.COMPOUND:{object_node['kegg']}"
+        elif "hmdb" in object_node:
+            object_node["id"] = f"HMDB:{object_node['hmdb']}"
+        else:
+            object_node["id"] = str(uuid.uuid4())
 
-    print(object_node)
+        yield object_node
+
+
 
 
 
