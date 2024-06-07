@@ -2,7 +2,8 @@
 Parser for GMMDA2 database (microbes-metabolites, microbes-diseases, and metabolites-diseases)
 ***
 record_example: <br>
-```ruby{
+```ruby
+{
    "_id":"6287_associated_with_264203",
    "association":{
       "predicate":"biolink:associated_with",
