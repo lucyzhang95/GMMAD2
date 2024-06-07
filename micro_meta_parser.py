@@ -1,12 +1,35 @@
+import csv
 import os
 import uuid
-
-import csv
-import biothings_client
 from collections.abc import Iterator
 
+import biothings_client
+
 """
-column names with index: {0: 'id', 1: 'g_micro', 2: 'organism', 3: 'g_meta', 4: 'metabolic', 5: 'pubchem_compound', 6: 'pubchem_id', 7: 'formula', 8: 'kegg_id', 9: 'tax_id', 10: 'phylum', 11: 'class', 12: 'order', 13: 'family', 14: 'genus', 15: 'species', 16: 'species_id', 17: 'source', 18: 'smiles_sequence', 19: 'HMDBID', 20: 'Origin'}
+column names with index: 
+    {
+        0: 'id', 
+        1: 'g_micro', 
+        2: 'organism', 
+        3: 'g_meta', 
+        4: 'metabolic', 
+        5: 'pubchem_compound', 
+        6: 'pubchem_id', 
+        7: 'formula', 
+        8: 'kegg_id', 
+        9: 'tax_id', 
+        10: 'phylum', 
+        11: 'class', 
+        12: 'order', 
+        13: 'family', 
+        14: 'genus', 
+        15: 'species', 
+        16: 'species_id', 
+        17: 'source', 
+        18: 'smiles_sequence', 
+        19: 'HMDBID', 
+        20: 'Origin'
+    }
 """
 
 
@@ -28,20 +51,26 @@ def get_taxon_info(file_path) -> Iterator[dict]:
     taxids = [line[9] for line in line_generator(file_path)]
     taxids = set(taxids)
     t = biothings_client.get_client("taxon")
-    taxon_info = t.gettaxa(taxids, fields=["scientific_name", "parent_taxid", "lineage", "rank"])
+    taxon_info = t.gettaxa(
+        taxids, fields=["scientific_name", "parent_taxid", "lineage", "rank"]
+    )
     yield taxon_info
 
 
 def get_nodes(file_path):
-    taxon_info = {int(taxon["query"]): taxon for obj in get_taxon_info(file_path) for taxon in obj if
-                  "notfound" not in taxon.keys()}
+    taxon_info = {
+        int(taxon["query"]): taxon
+        for obj in get_taxon_info(file_path)
+        for taxon in obj
+        if "notfound" not in taxon.keys()
+    }
 
     for line in line_generator(file_path):
         # create object node (metabolites)
         object_node = {
             "id": None,
             "name": line[5].lower(),
-            "type": "biolink:ChemicalEntity"
+            "type": "biolink:ChemicalEntity",
         }
 
         assign_col_val_if_available(object_node, "pubchem_cid", line[6], int)
@@ -63,7 +92,7 @@ def get_nodes(file_path):
         subject_node = {
             "id": None,
             "name": line[2].lower(),
-            "type": "biolink:OrganismalEntity"
+            "type": "biolink:OrganismalEntity",
         }
 
         assign_col_val_if_available(subject_node, "taxid", line[9], int)
@@ -73,15 +102,19 @@ def get_nodes(file_path):
             subject_node["id"] = str(uuid.uuid4())
 
         if subject_node.get("taxid") in taxon_info:
-            subject_node["scientific_name"] = taxon_info[subject_node["taxid"]]["scientific_name"]
-            subject_node["parent_taxid"] = taxon_info[subject_node["taxid"]]["parent_taxid"]
+            subject_node["scientific_name"] = taxon_info[subject_node["taxid"]][
+                "scientific_name"
+            ]
+            subject_node["parent_taxid"] = taxon_info[subject_node["taxid"]][
+                "parent_taxid"
+            ]
             subject_node["lineage"] = taxon_info[subject_node["taxid"]]["lineage"]
             subject_node["rank"] = taxon_info[subject_node["taxid"]]["rank"]
 
         # association node has the reference and source of metabolites
         association_node = {
             "predicate": "biolink:associated_with",
-            "infores": line[17]
+            "infores": line[17],
         }
         if line[20] and line[20] != "Unknown":
             association_node["source"] = line[20].split(";")
@@ -90,12 +123,16 @@ def get_nodes(file_path):
             "_id": None,
             "association": association_node,
             "object": object_node,
-            "subject": subject_node
+            "subject": subject_node,
         }
         if ":" in object_node["id"] and ":" in subject_node["id"]:
-            output_dict["_id"] = f"{object_node['id'].split(':')[1]}_associated_with_{subject_node['id'].split(':')[1]}"
+            output_dict["_id"] = (
+                f"{object_node['id'].split(':')[1]}_associated_with_{subject_node['id'].split(':')[1]}"
+            )
         else:
-            output_dict["_id"] = f"{object_node['id']}_associated_with_{subject_node['id']}"
+            output_dict["_id"] = (
+                f"{object_node['id']}_associated_with_{subject_node['id']}"
+            )
 
         yield output_dict
 
@@ -120,4 +157,3 @@ def load_micro_meta_data():
 #         _ids.append(obj["_id"])
 #     print(f"total records: {len(_ids)}")
 #     print(f"total records with no duplications: {len(set(_ids))}")
-
