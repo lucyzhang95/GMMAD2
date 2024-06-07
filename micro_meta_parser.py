@@ -105,16 +105,19 @@ def load_micro_meta_data():
     file_path = os.path.join(path, "data", "micro_metabolic.csv")
     assert os.path.exists(file_path), f"The file {file_path} does not exist."
 
+    dup_ids = set()
     recs = get_nodes(file_path)
     for rec in recs:
-        yield rec
+        if rec["_id"] not in dup_ids:
+            dup_ids.add(rec["_id"])
+            yield rec
 
 
-if __name__ == "__main__":
-    micro_meta_data = load_micro_meta_data()
-    _ids = []
-    for obj in micro_meta_data:
-        _ids.append(obj["_id"])
-    print(f"total records: {len(_ids)}")
-    print(f"total records with no duplications: {len(set(_ids))}")
+# if __name__ == "__main__":
+#     micro_meta_data = load_micro_meta_data()
+#     _ids = []
+#     for obj in micro_meta_data:
+#         _ids.append(obj["_id"])
+#     print(f"total records: {len(_ids)}")
+#     print(f"total records with no duplications: {len(set(_ids))}")
 
