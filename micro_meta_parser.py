@@ -54,14 +54,13 @@ def get_taxon_info(file_path) -> Iterator[dict]:
     taxon_info = t.gettaxa(
         taxids, fields=["scientific_name", "parent_taxid", "lineage", "rank"]
     )
-    yield taxon_info
+    return taxon_info
 
 
 def get_nodes(file_path):
     taxon_info = {
         int(taxon["query"]): taxon
-        for obj in get_taxon_info(file_path)
-        for taxon in obj
+        for taxon in get_taxon_info(file_path)
         if "notfound" not in taxon.keys()
     }
 
@@ -70,7 +69,7 @@ def get_nodes(file_path):
         object_node = {
             "id": None,
             "name": line[5].lower(),
-            "type": "biolink:ChemicalEntity",
+            "type": "biolink:SmallMolecule",
         }
 
         assign_col_val_if_available(object_node, "pubchem_cid", line[6], int)
@@ -117,7 +116,9 @@ def get_nodes(file_path):
             "infores": line[17],
         }
         if line[20] and line[20] != "Unknown":
-            association_node["sources"] = [src.strip().lower() for src in line[20].split(";")]
+            association_node["sources"] = [
+                src.strip().lower() for src in line[20].split(";")
+            ]
 
         output_dict = {
             "_id": None,
@@ -127,19 +128,19 @@ def get_nodes(file_path):
         }
         if ":" in object_node["id"] and ":" in subject_node["id"]:
             output_dict["_id"] = (
-                f"{object_node['id'].split(':')[1]}_associated_with_{subject_node['id'].split(':')[1]}"
+                f"{subject_node['id'].split(':')[1]}_associated_with_{object_node['id'].split(':')[1]}"
             )
         elif ":" not in object_node["id"] and ":" in subject_node["id"]:
             output_dict["_id"] = (
-                f"{object_node['id']}_associated_with_{subject_node['id'].split(':')[1]}"
+                f"{subject_node['id'].split(':')[1]}_associated_with_{object_node['id']}"
             )
         elif ":" in object_node["id"] and ":" not in subject_node["id"]:
             output_dict["_id"] = (
-                f"{object_node['id'].split(':')[1]}_associated_with_{subject_node['id']}"
+                f"{subject_node['id']}_associated_with_{object_node['id'].split(':')[1]}"
             )
         else:
             output_dict["_id"] = (
-                f"{object_node['id']}_associated_with_{subject_node['id']}"
+                f"{subject_node['id']}_associated_with_{object_node['id']}"
             )
 
         yield output_dict
