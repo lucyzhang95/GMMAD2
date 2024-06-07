@@ -98,11 +98,7 @@ def get_nodes(file_path):
             object_node["id"] = str(uuid.uuid4())
 
         # create subject node (microbes)
-        subject_node = {
-            "id": None,
-            "name": line[2].lower(),
-            "type": "biolink:OrganismalEntity",
-        }
+        subject_node = {"id": None, "name": line[2].lower(), "type": "biolink:OrganismalEntity"}
 
         assign_col_val_if_available(subject_node, "taxid", line[9], int)
         if "taxid" in subject_node:
@@ -115,6 +111,17 @@ def get_nodes(file_path):
             subject_node["parent_taxid"] = taxon_info[subject_node["taxid"]]["parent_taxid"]
             subject_node["lineage"] = taxon_info[subject_node["taxid"]]["lineage"]
             subject_node["rank"] = taxon_info[subject_node["taxid"]]["rank"]
+
+        # categorize subject microbial super kingdom type
+        if "lineage" in subject_node:
+            if 2 in subject_node["lineage"]:
+                subject_node["type"] = "biolink:Bacterium"
+            elif 10239 in subject_node["lineage"]:
+                subject_node["type"] = "biolink:Virus"
+            elif 4751 in subject_node["lineage"]:
+                subject_node["type"] = "biolink:Fungus"
+            else:
+                subject_node["type"] = "biolink:OrganismalEntity"
 
         # association node has the reference and source of metabolites
         association_node = {
@@ -162,10 +169,18 @@ def load_micro_meta_data():
 
 
 if __name__ == "__main__":
+    from collections import Counter
+
     micro_meta_data = load_micro_meta_data()
-    _ids = []
-    for obj in micro_meta_data:
-        print(obj)
-        _ids.append(obj["_id"])
-    print(f"total records: {len(_ids)}")
-    print(f"total records with no duplications: {len(set(_ids))}")
+
+    type_list = [obj["subject"]["type"] for obj in micro_meta_data]
+    type_counts = Counter(type_list)
+    for value, count in type_counts.items():
+        print(f"{value}: {count}")
+
+    # _ids = []
+    # for obj in micro_meta_data:
+    #     print(obj)
+    #     _ids.append(obj["_id"])
+    # print(f"total records: {len(_ids)}")
+    # print(f"total records with no duplications: {len(set(_ids))}")
