@@ -19,8 +19,8 @@ def line_generator(file_path):
         reader = csv.reader(in_f)
         # skip the header
         next(reader)
-        for row in reader:
-            yield row
+        for line in reader:
+            yield line
 
 
 def assign_col_val_if_available(node, key, val, transform=None):
@@ -28,18 +28,27 @@ def assign_col_val_if_available(node, key, val, transform=None):
         node[key] = transform(val) if transform else val
 
 
-def create_object_node():
-    for ls in line_generator(file_path):
+def get_taxon_info(file_path) -> Iterator[dict]:
+    taxids = [line[9] for line in line_generator(file_path)]
+    taxids = set(taxids)
+    t = biothings_client.get_client("taxon")
+    taxon_info = t.gettaxa(taxids, fields=["scientific_name", "parent_taxid", "lineage", "rank"])
+    yield taxon_info
+
+
+def create_object_node(file_path):
+    for line in line_generator(file_path):
         object_node = {
             "id": None,
-            "name": ls[5].lower()
+            "name": line[5].lower(),
+            "type": "biolink:ChemicalEntity"
         }
 
-        assign_col_val_if_available(object_node, "pubchem_cid", ls[6], int)
-        assign_col_val_if_available(object_node, "kegg", ls[8])
-        assign_col_val_if_available(object_node, "hmdb", ls[19])
-        assign_col_val_if_available(object_node, "chemical_formula", ls[7])
-        assign_col_val_if_available(object_node, "smiles", ls[18])
+        assign_col_val_if_available(object_node, "pubchem_cid", line[6], int)
+        assign_col_val_if_available(object_node, "kegg", line[8])
+        assign_col_val_if_available(object_node, "hmdb", line[19])
+        assign_col_val_if_available(object_node, "chemical_formula", line[7])
+        assign_col_val_if_available(object_node, "smiles", line[18])
 
         if "pubchem_cid" in object_node:
             object_node["id"] = f"PUBCHEM.COMPOUND:{object_node['pubchem_cid']}"
@@ -51,6 +60,35 @@ def create_object_node():
             object_node["id"] = str(uuid.uuid4())
 
         yield object_node
+
+
+def create_subject_node(file_path):
+    taxon_info = {int(taxon["query"]): taxon for obj in get_taxon_info(file_path) for taxon in obj if "notfound" not in taxon.keys()}
+
+    for line in line_generator(file_path):
+        subject_node = {
+            "id": None,
+            "name": line[2].lower(),
+            "type": "biolink:OrganismalEntity"
+        }
+
+        assign_col_val_if_available(subject_node, "taxid", line[9], int)
+        if "taxid" in subject_node:
+            subject_node["id"] = f"taxid:{subject_node['taxid']}"
+        else:
+            subject_node["id"] = str(uuid.uuid4())
+
+        if subject_node.get("taxid") in taxon_info:
+            subject_node["scientific_name"] = taxon_info[subject_node["taxid"]]["scientific_name"]
+            subject_node["parent_taxid"] = taxon_info[subject_node["taxid"]]["parent_taxid"]
+            subject_node["lineage"] = taxon_info[subject_node["taxid"]]["lineage"]
+            subject_node["rank"] = taxon_info[subject_node["taxid"]]["rank"]
+
+        yield subject_node
+
+
+
+
 
 
 
