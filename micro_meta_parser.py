@@ -4,14 +4,11 @@ import uuid
 import csv
 import biothings_client
 from collections.abc import Iterator
+import itertools
 
 """
 column names with index: {0: 'id', 1: 'g_micro', 2: 'organism', 3: 'g_meta', 4: 'metabolic', 5: 'pubchem_compound', 6: 'pubchem_id', 7: 'formula', 8: 'kegg_id', 9: 'tax_id', 10: 'phylum', 11: 'class', 12: 'order', 13: 'family', 14: 'genus', 15: 'species', 16: 'species_id', 17: 'source', 18: 'smiles_sequence', 19: 'HMDBID', 20: 'Origin'}
 """
-
-path = os.getcwd()
-file_path = os.path.join(path, "data", "micro_metabolic.csv")
-assert os.path.exists(file_path), f"The file {file_path} does not exist."
 
 
 def line_generator(file_path):
@@ -59,7 +56,7 @@ def create_object_node(file_path):
         else:
             object_node["id"] = str(uuid.uuid4())
 
-        yield object_node
+        return object_node
 
 
 def create_subject_node(file_path):
@@ -84,15 +81,39 @@ def create_subject_node(file_path):
             subject_node["lineage"] = taxon_info[subject_node["taxid"]]["lineage"]
             subject_node["rank"] = taxon_info[subject_node["taxid"]]["rank"]
 
-        yield subject_node
+        return subject_node
 
 
+def create_association_node(file_path):
+    for line in line_generator(file_path):
+        association_node = {
+            "predicate": "biolink:associated_with",
+            "infores": line[17]
+        }
+        if line[20] and line[20] != "Unknown":
+            association_node["source"] = line[20].split(";")
+        return association_node
 
 
+def merge(file_path):
+    association_nodes = create_association_node(file_path)
+    subject_nodes = create_subject_node(file_path)
+    object_nodes = create_object_node(file_path)
+
+    combined_iterators = itertools.chain(association_nodes, subject_nodes, object_nodes)
+    print(combined_iterators)
+    return combined_iterators
 
 
+def load_micro_meta_data():
+    path = os.getcwd()
+    file_path = os.path.join(path, "data", "micro_metabolic.csv")
+    assert os.path.exists(file_path), f"The file {file_path} does not exist."
+    merged_doc = merge(file_path)
+    return merged_doc
 
 
-
+if __name__ == "__main__":
+    micro_meta_data = load_micro_meta_data()
 
 
