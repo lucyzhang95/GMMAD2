@@ -33,8 +33,12 @@ def get_taxon_info(file_path) -> Iterator[dict]:
     yield taxon_info
 
 
-def create_object_node(file_path):
+def get_nodes(file_path):
+    taxon_info = {int(taxon["query"]): taxon for obj in get_taxon_info(file_path) for taxon in obj if
+                  "notfound" not in taxon.keys()}
+
     for line in line_generator(file_path):
+        # create object node (metabolites)
         object_node = {
             "id": None,
             "name": line[5].lower(),
@@ -56,13 +60,7 @@ def create_object_node(file_path):
         else:
             object_node["id"] = str(uuid.uuid4())
 
-        return object_node
-
-
-def create_subject_node(file_path):
-    taxon_info = {int(taxon["query"]): taxon for obj in get_taxon_info(file_path) for taxon in obj if "notfound" not in taxon.keys()}
-
-    for line in line_generator(file_path):
+        # create subject node (microbes)
         subject_node = {
             "id": None,
             "name": line[2].lower(),
@@ -81,39 +79,41 @@ def create_subject_node(file_path):
             subject_node["lineage"] = taxon_info[subject_node["taxid"]]["lineage"]
             subject_node["rank"] = taxon_info[subject_node["taxid"]]["rank"]
 
-        return subject_node
-
-
-def create_association_node(file_path):
-    for line in line_generator(file_path):
+        # association node has the reference and source of metabolites
         association_node = {
             "predicate": "biolink:associated_with",
             "infores": line[17]
         }
         if line[20] and line[20] != "Unknown":
             association_node["source"] = line[20].split(";")
-        return association_node
 
+        output_dict = {
+            "_id": None,
+            "association": association_node,
+            "object": object_node,
+            "subject": subject_node
+        }
+        if ":" in object_node["id"] and ":" in subject_node["id"]:
+            output_dict["_id"] = f"{object_node['id'].split(':')[1]}_associated_with_{subject_node['id'].split(':')[1]}"
+        else:
+            output_dict["_id"] = f"{object_node['id']}_associated_with_{subject_node['id']}"
 
-def merge(file_path):
-    association_nodes = create_association_node(file_path)
-    subject_nodes = create_subject_node(file_path)
-    object_nodes = create_object_node(file_path)
-
-    combined_iterators = itertools.chain(association_nodes, subject_nodes, object_nodes)
-    print(combined_iterators)
-    return combined_iterators
+        yield output_dict
 
 
 def load_micro_meta_data():
     path = os.getcwd()
     file_path = os.path.join(path, "data", "micro_metabolic.csv")
     assert os.path.exists(file_path), f"The file {file_path} does not exist."
-    merged_doc = merge(file_path)
-    return merged_doc
+
+    docs = get_nodes(file_path)
+    for doc in docs:
+        yield doc
 
 
 if __name__ == "__main__":
     micro_meta_data = load_micro_meta_data()
+    for obj in micro_meta_data:
+        print(obj)
 
 
