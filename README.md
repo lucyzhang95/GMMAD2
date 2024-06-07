@@ -9,11 +9,11 @@ record_example: <br>
       "predicate":"biolink:associated_with",
       "infores":"wom",
       "sources":[
-         "Host",
-         "Microbiota",
-         "Food related",
-         "Drug related",
-         "Environment"
+         "host",
+         "microbiota",
+         "food related",
+         "drug related",
+         "environment"
       ]
    },
    "object":{
