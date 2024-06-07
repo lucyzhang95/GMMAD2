@@ -51,9 +51,7 @@ def get_taxon_info(file_path) -> Iterator[dict]:
     taxids = [line[9] for line in line_generator(file_path)]
     taxids = set(taxids)
     t = biothings_client.get_client("taxon")
-    taxon_info = t.gettaxa(
-        taxids, fields=["scientific_name", "parent_taxid", "lineage", "rank"]
-    )
+    taxon_info = t.gettaxa(taxids, fields=["scientific_name", "parent_taxid", "lineage", "rank"])
     return taxon_info
 
 
@@ -101,12 +99,8 @@ def get_nodes(file_path):
             subject_node["id"] = str(uuid.uuid4())
 
         if subject_node.get("taxid") in taxon_info:
-            subject_node["scientific_name"] = taxon_info[subject_node["taxid"]][
-                "scientific_name"
-            ]
-            subject_node["parent_taxid"] = taxon_info[subject_node["taxid"]][
-                "parent_taxid"
-            ]
+            subject_node["scientific_name"] = taxon_info[subject_node["taxid"]]["scientific_name"]
+            subject_node["parent_taxid"] = taxon_info[subject_node["taxid"]]["parent_taxid"]
             subject_node["lineage"] = taxon_info[subject_node["taxid"]]["lineage"]
             subject_node["rank"] = taxon_info[subject_node["taxid"]]["rank"]
 
@@ -116,9 +110,7 @@ def get_nodes(file_path):
             "infores": line[17],
         }
         if line[20] and line[20] != "Unknown":
-            association_node["sources"] = [
-                src.strip().lower() for src in line[20].split(";")
-            ]
+            association_node["sources"] = [src.strip().lower() for src in line[20].split(";")]
 
         output_dict = {
             "_id": None,
@@ -139,9 +131,7 @@ def get_nodes(file_path):
                 f"{subject_node['id']}_associated_with_{object_node['id'].split(':')[1]}"
             )
         else:
-            output_dict["_id"] = (
-                f"{subject_node['id']}_associated_with_{object_node['id']}"
-            )
+            output_dict["_id"] = f"{subject_node['id']}_associated_with_{object_node['id']}"
 
         yield output_dict
 
