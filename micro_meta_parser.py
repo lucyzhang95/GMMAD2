@@ -47,6 +47,12 @@ def assign_col_val_if_available(node, key, val, transform=None):
         node[key] = transform(val) if transform else val
 
 
+def assign_to_xrefs_if_available(node, key, val, transform=None):
+    if val and val != "not available":
+        xrefs = {key: val}
+        node.update({"xrefs": xrefs})
+
+
 def get_taxon_info(file_path) -> Iterator[dict]:
     taxids = [line[9] for line in line_generator(file_path)]
     taxids = set(taxids)
@@ -71,10 +77,16 @@ def get_nodes(file_path):
         }
 
         assign_col_val_if_available(object_node, "pubchem_cid", line[6], int)
-        assign_col_val_if_available(object_node, "kegg", line[8])
-        assign_col_val_if_available(object_node, "hmdb", line[19])
         assign_col_val_if_available(object_node, "chemical_formula", line[7])
         assign_col_val_if_available(object_node, "smiles", line[18])
+        if "pubchem_cid" not in object_node:
+            assign_col_val_if_available(object_node, "kegg", line[8])
+        else:
+            assign_to_xrefs_if_available(object_node, "kegg", line[8])
+        if "hmdb" in object_node:
+            assign_col_val_if_available(object_node, "hmdb", line[19])
+        else:
+            assign_to_xrefs_if_available(object_node, "hmdb", line[19])
 
         if "pubchem_cid" in object_node:
             object_node["id"] = f"PUBCHEM.COMPOUND:{object_node['pubchem_cid']}"
@@ -149,11 +161,11 @@ def load_micro_meta_data():
             yield rec
 
 
-# if __name__ == "__main__":
-#     micro_meta_data = load_micro_meta_data()
-#     _ids = []
-#     for obj in micro_meta_data:
-#         print(obj)
-#         _ids.append(obj["_id"])
-#     print(f"total records: {len(_ids)}")
-#     print(f"total records with no duplications: {len(set(_ids))}")
+if __name__ == "__main__":
+    micro_meta_data = load_micro_meta_data()
+    _ids = []
+    for obj in micro_meta_data:
+        print(obj)
+        _ids.append(obj["_id"])
+    print(f"total records: {len(_ids)}")
+    print(f"total records with no duplications: {len(set(_ids))}")
