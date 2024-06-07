@@ -117,7 +117,7 @@ def get_nodes(file_path):
             "infores": line[17],
         }
         if line[20] and line[20] != "Unknown":
-            association_node["sources"] = [src.strip() for src in line[20].split(";")]
+            association_node["sources"] = [src.strip().lower() for src in line[20].split(";")]
 
         output_dict = {
             "_id": None,
