@@ -7,29 +7,29 @@ import biothings_client
 
 """
 column names with index: 
-    {
-        0: 'id', 
-        1: 'g_micro', 
-        2: 'organism', 
-        3: 'g_meta', 
-        4: 'metabolic', 
-        5: 'pubchem_compound', 
-        6: 'pubchem_id', 
-        7: 'formula', 
-        8: 'kegg_id', 
-        9: 'tax_id', 
-        10: 'phylum', 
-        11: 'class', 
-        12: 'order', 
-        13: 'family', 
-        14: 'genus', 
-        15: 'species', 
-        16: 'species_id', 
-        17: 'source', 
-        18: 'smiles_sequence', 
-        19: 'HMDBID', 
-        20: 'Origin'
-    }
+{
+    0: 'id', 
+    1: 'g_micro', 
+    2: 'organism', 
+    3: 'g_meta', 
+    4: 'metabolic', 
+    5: 'pubchem_compound', 
+    6: 'pubchem_id', 
+    7: 'formula', 
+    8: 'kegg_id', 
+    9: 'tax_id', 
+    10: 'phylum', 
+    11: 'class', 
+    12: 'order', 
+    13: 'family', 
+    14: 'genus', 
+    15: 'species', 
+    16: 'species_id', 
+    17: 'source', 
+    18: 'smiles_sequence', 
+    19: 'HMDBID', 
+    20: 'Origin'
+}
 """
 
 
