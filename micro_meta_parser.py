@@ -117,7 +117,7 @@ def get_nodes(file_path):
             "infores": line[17],
         }
         if line[20] and line[20] != "Unknown":
-            association_node["source"] = line[20].split(";")
+            association_node["sources"] = [src.strip() for src in line[20].split(";")]
 
         output_dict = {
             "_id": None,
@@ -128,6 +128,14 @@ def get_nodes(file_path):
         if ":" in object_node["id"] and ":" in subject_node["id"]:
             output_dict["_id"] = (
                 f"{object_node['id'].split(':')[1]}_associated_with_{subject_node['id'].split(':')[1]}"
+            )
+        elif ":" not in object_node["id"] and ":" in subject_node["id"]:
+            output_dict["_id"] = (
+                f"{object_node['id']}_associated_with_{subject_node['id'].split(':')[1]}"
+            )
+        elif ":" in object_node["id"] and ":" not in subject_node["id"]:
+            output_dict["_id"] = (
+                f"{object_node['id'].split(':')[1]}_associated_with_{subject_node['id']}"
             )
         else:
             output_dict["_id"] = (
@@ -154,6 +162,7 @@ def load_micro_meta_data():
 #     micro_meta_data = load_micro_meta_data()
 #     _ids = []
 #     for obj in micro_meta_data:
+#         print(obj)
 #         _ids.append(obj["_id"])
 #     print(f"total records: {len(_ids)}")
 #     print(f"total records with no duplications: {len(set(_ids))}")
