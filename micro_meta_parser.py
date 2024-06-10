@@ -61,7 +61,7 @@ def get_taxon_info(file_path) -> Iterator[dict]:
     return taxon_info
 
 
-def get_nodes(file_path):
+def get_node_info(file_path):
     taxon_info = {
         int(taxon["query"]): taxon
         for taxon in get_taxon_info(file_path)
@@ -161,7 +161,7 @@ def load_micro_meta_data():
     assert os.path.exists(file_path), f"The file {file_path} does not exist."
 
     dup_ids = set()
-    recs = get_nodes(file_path)
+    recs = get_node_info(file_path)
     for rec in recs:
         if rec["_id"] not in dup_ids:
             dup_ids.add(rec["_id"])
