@@ -181,4 +181,4 @@ def load_micro_meta_data():
 #     print(obj)
 #     _ids.append(obj["_id"])
 # print(f"total records: {len(_ids)}")
-# print(f"total records with no duplications: {len(set(_ids))}")
+# print(f"total records without duplicates: {len(set(_ids))}")
