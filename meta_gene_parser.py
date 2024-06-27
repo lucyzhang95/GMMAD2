@@ -143,29 +143,29 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
         assign_col_val_if_available(object_node, "entrezgene", line[14])
         assign_col_val_if_available(object_node, "protein_size", line[17], int)
 
-        # add gene id via a hierarchical order: 1.entrezgene, 2.ensembl, 3.hgnc, and 4.uniportkb
+        # add gene id via a hierarchical order: 1.entrezgene, 2.ensemblgene, 3.hgnc, and 4.uniportkb
         if "entrezgene" in object_node:
-            assign_to_xrefs_if_available(object_node, "ensembl", line[13])
+            assign_to_xrefs_if_available(object_node, "ensemblgene", line[13])
         else:
-            assign_col_val_if_available(object_node, "ensembl", line[13])
-        if "entrezgene" not in object_node and "ensembl" not in object_node:
+            assign_col_val_if_available(object_node, "ensemblgene", line[13])
+        if "entrezgene" not in object_node and "ensemblgene" not in object_node:
             assign_col_val_if_available(object_node, "hgnc", line[15], int)
         else:
             assign_to_xrefs_if_available(object_node, "hgnc", line[15], int)
         if (
             "entrezgene" not in object_node
-            and "ensembl" not in object_node
+            and "ensemblgene" not in object_node
             and "hgnc" not in object_node
         ):
             assign_col_val_if_available(object_node, "uniprotkb", line[16])
         else:
             assign_to_xrefs_if_available(object_node, "uniprotkb", line[16])
 
-        # assign ids via a hierarchical order: 1.entrezgene, 2.ensembl, 3.hgnc, and 4.uniprotkb
+        # assign ids via a hierarchical order: 1.entrezgene, 2.ensemblgene, 3.hgnc, and 4.uniprotkb
         if "entrezgene" in object_node:
             object_node["id"] = f"NCBIGene:{object_node['entrezgene']}"
-        elif "ensembl" in object_node:
-            object_node["id"] = f"ENSEMBL:{object_node['ensembl']}"
+        elif "ensemblgene" in object_node:
+            object_node["id"] = f"ENSEMBL:{object_node['ensemblgene']}"
         elif "hgnc" in object_node:
             object_node["id"] = f"HGNC:{object_node['hgnc']}"
         else:
@@ -174,8 +174,8 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
         # assign gene names by using biothings_client
         if "entrezgene" in object_node and object_node["entrezgene"] in gene_name:
             object_node["name"] = gene_name[object_node["entrezgene"]]["name"]
-        elif "ensembl" in object_node and object_node["ensembl"] in gene_name:
-            object_node["name"] = gene_name[object_node["ensembl"]].get("name")
+        elif "ensemblgene" in object_node and object_node["ensemblgene"] in gene_name:
+            object_node["name"] = gene_name[object_node["ensemblgene"]].get("name")
         elif "uniprotkb" in object_node and object_node["uniprotkb"] in gene_name:
             object_node["name"] = gene_name[object_node["uniprotkb"]]["name"]
 
