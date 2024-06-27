@@ -165,6 +165,8 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
                 subject_node["type"] = "biolink:Virus"
             elif 4751 in subject_node["lineage"]:
                 subject_node["type"] = "biolink:Fungus"
+            elif 2157 in subject_node["lineage"]:
+                subject_node["type"] = "biolink:Archaea"
             else:
                 subject_node["type"] = "biolink:OrganismalEntity"
 
