@@ -87,14 +87,14 @@ def assign_to_xrefs_if_available(node: dict, key: str, val: str | int | float, t
 
 def get_gene_name(gene_ids: list) -> list:
     """retrieves gene names for a given list of gene IDs using biothings_client
-        This function takes a list of gene IDs, removes any duplicates by converting the list to a set
-        Queries a gene database client for the gene names associated with these IDs.
-        The IDs are searched across multiple scopes: "entrezgene", "ensembl.gene", and "uniprot".
+    This function takes a list of gene IDs, removes any duplicates by converting the list to a set
+    Queries a gene database client for the gene names associated with these IDs.
+    The IDs are searched across multiple scopes: "entrezgene", "ensembl.gene", and "uniprot".
 
-        :param gene_ids: A list of gene IDs to be queried.
-        :type gene_ids: list
-        :return: A list of dictionaries containing the gene names and associated information.
-        """
+    :param gene_ids: A list of gene IDs to be queried.
+    :type gene_ids: list
+    :return: A list of dictionaries containing the gene names and associated information.
+    """
     gene_ids = set(gene_ids)
     t = biothings_client.get_client("gene")
     gene_names = t.querymany(
