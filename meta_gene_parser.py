@@ -150,13 +150,13 @@ def get_node_info(file_path):
         # create subject node (metabolites)
         subject_node = {
             "id": None,
-            "name": line[2],
+            "name": line[2].lower(),
             "type": "biolink:SmallMolecule",
         }
 
         assign_col_val_if_available(subject_node, "pubchem_cid", line[3], int)
         assign_col_val_if_available(subject_node, "drugbank", line[7])
-        assign_col_val_if_available(subject_node, "drug_name", line[8])
+        assign_col_val_if_available(subject_node, "drug_name", line[8].lower())
         assign_col_val_if_available(subject_node, "chemical_formula", line[4])
         assign_col_val_if_available(subject_node, "smiles", line[10])
 
