@@ -109,7 +109,7 @@ metabolite-gene record example:
    "_id":"6912_associated_with_7498",
    "association":{
       "predicate":"biolink:associated_with",
-      "score":"0.891",
+      "score":0.891,
       "sources":[
          "host",
          "microbiota",
