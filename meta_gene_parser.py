@@ -204,11 +204,11 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
             assign_to_xrefs_if_available(subject_node, "kegg", line[5])
         else:
             assign_col_val_if_available(subject_node, "kegg", line[5])
-        if any(key in subject_node for key in ("pubchem_cid", "kegg")):
+        if "pubchem_cid" not in subject_node and "kegg" not in subject_node:
             assign_col_val_if_available(subject_node, "hmdb", line[6])
         else:
             assign_to_xrefs_if_available(subject_node, "hmdb", line[6])
-        if any(key in subject_node for key in ("pubchem_cid", "kegg", "drugbank")):
+        if "pubchem_cid" not in subject_node and "kegg" not in subject_node and "drugbank" not in subject_node:
             assign_col_val_if_available(subject_node, "drugbank", line[7])
         else:
             assign_to_xrefs_if_available(subject_node, "drugbank", line[7])
@@ -282,11 +282,11 @@ def load_meta_gene_data() -> Iterator[dict]:
             yield rec
 
 
-# if __name__ == "__main__":
-#     _ids = []
-#     meta_gene_data = load_meta_gene_data()
-#     for obj in meta_gene_data:
-#         print(obj)
-#         _ids.append(obj["_id"])
-#     print(f"total records: {len(_ids)}")
-#     print(f"total records without duplicates: {len(set(_ids))}")
+if __name__ == "__main__":
+    _ids = []
+    meta_gene_data = load_meta_gene_data()
+    for obj in meta_gene_data:
+        print(obj)
+        _ids.append(obj["_id"])
+    print(f"total records: {len(_ids)}")
+    print(f"total records without duplicates: {len(set(_ids))}")
