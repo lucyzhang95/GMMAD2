@@ -49,8 +49,10 @@ def assign_col_val_if_available(node, key, val, transform=None):
 
 def assign_to_xrefs_if_available(node, key, val, transform=None):
     if val and val != "not available":
-        xrefs = {key: val}
-        node.update({"xrefs": xrefs})
+        if "xrefs" not in node:
+            node["xrefs"] = {}
+
+        node["xrefs"][key] = transform(val) if transform else val
 
 
 def get_taxon_info(file_path) -> Iterator[dict]:
@@ -79,11 +81,12 @@ def get_node_info(file_path):
         assign_col_val_if_available(object_node, "pubchem_cid", line[6], int)
         assign_col_val_if_available(object_node, "chemical_formula", line[7])
         assign_col_val_if_available(object_node, "smiles", line[18])
-        if "pubchem_cid" not in object_node:
-            assign_col_val_if_available(object_node, "kegg", line[8])
-        else:
+
+        if "pubchem_cid" in object_node:
             assign_to_xrefs_if_available(object_node, "kegg", line[8])
-        if "hmdb" in object_node:
+        else:
+            assign_col_val_if_available(object_node, "kegg", line[8])
+        if "pubchem_cid" not in object_node and "kegg" not in object_node:
             assign_col_val_if_available(object_node, "hmdb", line[19])
         else:
             assign_to_xrefs_if_available(object_node, "hmdb", line[19])
@@ -139,15 +142,15 @@ def get_node_info(file_path):
         }
         if ":" in object_node["id"] and ":" in subject_node["id"]:
             output_dict["_id"] = (
-                f"{subject_node['id'].split(':')[1]}_associated_with_{object_node['id'].split(':')[1]}"
+                f"{subject_node['id'].split(':')[1].strip()}_associated_with_{object_node['id'].split(':')[1].strip()}"
             )
         elif ":" not in object_node["id"] and ":" in subject_node["id"]:
             output_dict["_id"] = (
-                f"{subject_node['id'].split(':')[1]}_associated_with_{object_node['id']}"
+                f"{subject_node['id'].split(':')[1].strip()}_associated_with_{object_node['id']}"
             )
         elif ":" in object_node["id"] and ":" not in subject_node["id"]:
             output_dict["_id"] = (
-                f"{subject_node['id']}_associated_with_{object_node['id'].split(':')[1]}"
+                f"{subject_node['id']}_associated_with_{object_node['id'].split(':')[1].strip()}"
             )
         else:
             output_dict["_id"] = f"{subject_node['id']}_associated_with_{object_node['id']}"
@@ -168,17 +171,17 @@ def load_micro_meta_data():
             yield rec
 
 
-# if __name__ == "__main__":
-# from collections import Counter
-# micro_meta_data = load_micro_meta_data()
-# type_list = [obj["subject"]["type"] for obj in micro_meta_data]
-# type_counts = Counter(type_list)
-# for value, count in type_counts.items():
-#     print(f"{value}: {count}")
+if __name__ == "__main__":
+    # from collections import Counter
+    micro_meta_data = load_micro_meta_data()
+    # type_list = [obj["subject"]["type"] for obj in micro_meta_data]
+    # type_counts = Counter(type_list)
+    # for value, count in type_counts.items():
+    #     print(f"{value}: {count}")
 
-# _ids = []
-# for obj in micro_meta_data:
-#     print(obj)
-#     _ids.append(obj["_id"])
-# print(f"total records: {len(_ids)}")
-# print(f"total records without duplicates: {len(set(_ids))}")
+    _ids = []
+    for obj in micro_meta_data:
+        print(obj)
+        _ids.append(obj["_id"])
+    print(f"total records: {len(_ids)}")
+    print(f"total records without duplicates: {len(set(_ids))}")
