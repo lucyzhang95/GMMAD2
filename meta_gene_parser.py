@@ -210,7 +210,11 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
             assign_col_val_if_available(subject_node, "hmdb", line[6])
         else:
             assign_to_xrefs_if_available(subject_node, "hmdb", line[6])
-        if "pubchem_cid" not in subject_node and "kegg_compound" not in subject_node and "drugbank" not in subject_node:
+        if (
+            "pubchem_cid" not in subject_node
+            and "kegg_compound" not in subject_node
+            and "drugbank" not in subject_node
+        ):
             assign_col_val_if_available(subject_node, "drugbank", line[7])
         else:
             assign_to_xrefs_if_available(subject_node, "drugbank", line[7])
