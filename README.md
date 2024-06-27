@@ -2,7 +2,7 @@
 Parser for GMMDA2 database (microbes-metabolites, microbes-diseases, and metabolites-diseases)
 ***
 
-microbe-metabolite record_example: <br>
+microbe-metabolite record example: <br>
 ```ruby
 {
    "_id":"264203_associated_with_6287",
@@ -25,6 +25,7 @@ microbe-metabolite record_example: <br>
       "chemical_formula":"C5H11NO2",
       "smiles":"CC(C)C(C(=O)O)N",
       "xrefs":{
+         "kegg":"C00183",
          "hmdb":"HMDB0000883"
       }
    },
@@ -103,7 +104,7 @@ microbe-disease record example: <br>
 }
 ```
 
-metabolite-gene record example:
+metabolite-gene record example: <br>
 ```ruby
 {
    "_id":"6912_associated_with_7498",
