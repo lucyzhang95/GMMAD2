@@ -138,11 +138,11 @@ metabolite-gene record example: <br>
    },
    "subject":{
       "id":"PUBCHEM.COMPOUND:6912",
-      "name":"Xylitol",
+      "name":"xylitol",
       "type":"biolink:SmallMolecule",
       "pubchem_cid":6912,
       "drugbank":"DB11195",
-      "drug_name":"Xylitol",
+      "drug_name":"xylitol",
       "chemical_formula":"C5H12O5",
       "smiles":"C(C(C(C(CO)O)O)O)O",
       "xrefs":{
