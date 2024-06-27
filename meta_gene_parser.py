@@ -179,7 +179,7 @@ def get_node_info(file_path):
         # association node has the qualifier, reference and source of metabolites
         association_node = {"predicate": "biolink:associated_with"}
 
-        assign_col_val_if_available(association_node, "score", line[19])
+        assign_col_val_if_available(association_node, "score", line[19], int)
         assign_col_val_if_available(association_node, "pmid", line[21], int)
 
         if line[9] and line[9] != "Unknown":
