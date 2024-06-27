@@ -36,7 +36,7 @@ column names with index:
 """
 
 
-def line_generator(in_file):
+def line_generator(in_file: str | os.PathLike) -> Iterator[list]:
     with open(in_file) as in_f:
         reader = csv.reader(in_f)
         next(reader)
@@ -44,12 +44,12 @@ def line_generator(in_file):
             yield line
 
 
-def assign_col_val_if_available(node, key, val, transform=None):
+def assign_col_val_if_available(node: dict, key: str, val: str | int | float, transform=None):
     if val and val != "not available":
         node[key] = transform(val) if transform else val
 
 
-def assign_to_xrefs_if_available(node, key, val, transform=None):
+def assign_to_xrefs_if_available(node: dict, key: str, val: str | int | float, transform=None):
     if val and val != "not available":
         if "xrefs" not in node:
             node["xrefs"] = {}
@@ -57,7 +57,7 @@ def assign_to_xrefs_if_available(node, key, val, transform=None):
         node["xrefs"][key] = transform(val) if transform else val
 
 
-def get_gene_name(gene_ids):
+def get_gene_name(gene_ids: list) -> list:
     gene_ids = set(gene_ids)
     t = biothings_client.get_client("gene")
     gene_names = t.querymany(
@@ -66,7 +66,7 @@ def get_gene_name(gene_ids):
     return gene_names
 
 
-def get_node_info(file_path):
+def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
     entrezgene_ids = [
         line[14] for line in line_generator(file_path) if "not available" not in line[14]
     ]
@@ -216,7 +216,7 @@ def get_node_info(file_path):
         yield output_dict
 
 
-def load_meta_gene_data():
+def load_meta_gene_data() -> Iterator[dict]:
     path = os.getcwd()
     file_path = os.path.join(path, "data", "meta_gene_net.csv")
     assert os.path.exists(file_path), f"The file {file_path} does not exist."
@@ -229,11 +229,11 @@ def load_meta_gene_data():
             yield rec
 
 
-if __name__ == "__main__":
-    _ids = []
-    meta_gene_data = load_meta_gene_data()
-    for obj in meta_gene_data:
-        print(obj)
-        _ids.append(obj["_id"])
-    print(f"total records: {len(_ids)}")
-    print(f"total records without duplicates: {len(set(_ids))}")
+# if __name__ == "__main__":
+#     _ids = []
+#     meta_gene_data = load_meta_gene_data()
+#     for obj in meta_gene_data:
+#         print(obj)
+#         _ids.append(obj["_id"])
+#     print(f"total records: {len(_ids)}")
+#     print(f"total records without duplicates: {len(set(_ids))}")
