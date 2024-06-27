@@ -37,6 +37,12 @@ column names with index:
 
 
 def line_generator(in_file: str | os.PathLike) -> Iterator[list]:
+    """generates lines from a CSV file, yielding each line as a list of strings
+    This function opens the specified CSV file, skips the header row, and yields each subsequent line as a list of strings.
+
+    :param in_file: The path to the CSV file.
+    :return: An iterator that yields each line of the CSV file as a list of strings.
+    """
     with open(in_file) as in_f:
         reader = csv.reader(in_f)
         next(reader)
@@ -45,11 +51,33 @@ def line_generator(in_file: str | os.PathLike) -> Iterator[list]:
 
 
 def assign_col_val_if_available(node: dict, key: str, val: str | int | float, transform=None):
+    """assigns a value to a specified key in a dictionary if the value is available and not equal to "not available"
+    This function updates the given dictionary with the provided key and value.
+    It can also transform the value using a specified function before assigning it.
+
+    :param node: The dictionary to be updated.
+    :param key: The key to be assigned the value in the dictionary.
+    :param val: The value to be assigned to the key in the dictionary.
+    :param transform: An optional function to transform the value before assignment. If None, the value is assigned as is.
+    :return: None
+    """
     if val and val != "not available":
         node[key] = transform(val) if transform else val
 
 
 def assign_to_xrefs_if_available(node: dict, key: str, val: str | int | float, transform=None):
+    """assigns a value to the 'xrefs' sub-dictionary of a given dictionary
+    This function checks if the 'xrefs' key exists in the given dictionary.
+    If not, it initializes 'xrefs' as an empty dictionary.
+    Then, it assigns the provided value to the specified key within the 'xrefs' dictionary
+    It can also transform the value using a specified function.
+
+    :param node: The dictionary to be updated.
+    :param key: The key to be assigned the value in the 'xrefs' sub-dictionary.
+    :param val: The value to be assigned to the key in the 'xrefs' sub-dictionary.
+    :param transform: An optional function to transform the value before assignment. If None, the value is assigned as is.
+    :return: None
+    """
     if val and val != "not available":
         if "xrefs" not in node:
             node["xrefs"] = {}
@@ -58,6 +86,15 @@ def assign_to_xrefs_if_available(node: dict, key: str, val: str | int | float, t
 
 
 def get_gene_name(gene_ids: list) -> list:
+    """retrieves gene names for a given list of gene IDs using biothings_client
+        This function takes a list of gene IDs, removes any duplicates by converting the list to a set
+        Queries a gene database client for the gene names associated with these IDs.
+        The IDs are searched across multiple scopes: "entrezgene", "ensembl.gene", and "uniprot".
+
+        :param gene_ids: A list of gene IDs to be queried.
+        :type gene_ids: list
+        :return: A list of dictionaries containing the gene names and associated information.
+        """
     gene_ids = set(gene_ids)
     t = biothings_client.get_client("gene")
     gene_names = t.querymany(
@@ -67,6 +104,15 @@ def get_gene_name(gene_ids: list) -> list:
 
 
 def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
+    """generates node dictionaries from meta_gene_net.csv file
+    This function reads gene and metabolite data and processes it.
+    It generates object, subject, and association nodes.
+
+    :param file_path: path to meta_gene_net.csv file
+    :return: An iterator of dictionaries containing node information.
+    """
+
+    # gather gene ids from the file
     entrezgene_ids = [
         line[14] for line in line_generator(file_path) if "not available" not in line[14]
     ]
@@ -217,6 +263,14 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
 
 
 def load_meta_gene_data() -> Iterator[dict]:
+    """loads and yields unique meta gene data records from meta_gene_net.csv file.
+
+    This function constructs the file path to meta_gene_net.csv file,
+    retrieves node information using the `get_node_info` function,
+    and yields unique records based on `_id`.
+
+    :return: An iterator of unique dictionaries containing meta gene data.
+    """
     path = os.getcwd()
     file_path = os.path.join(path, "data", "meta_gene_net.csv")
     assert os.path.exists(file_path), f"The file {file_path} does not exist."
