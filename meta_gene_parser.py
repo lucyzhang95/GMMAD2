@@ -201,23 +201,25 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
         assign_col_val_if_available(subject_node, "chemical_formula", line[4])
         assign_col_val_if_available(subject_node, "smiles", line[10])
 
-        # add chemicals via a hierarchical order: 1.pubchem_cid, 2.kegg, 3.hmdb, and 4.drugbank
+        # add chemicals via a hierarchical order: 1.pubchem_cid, 2.kegg_compound, 3.hmdb, and 4.drugbank
         if "pubchem_cid" in subject_node:
-            assign_to_xrefs_if_available(subject_node, "kegg", line[5])
+            assign_to_xrefs_if_available(subject_node, "kegg_compound", line[5])
         else:
-            assign_col_val_if_available(subject_node, "kegg", line[5])
-        if "pubchem_cid" not in subject_node and "kegg" not in subject_node:
+            assign_col_val_if_available(subject_node, "kegg_compound", line[5])
+        if "pubchem_cid" not in subject_node and "kegg_compound" not in subject_node:
             assign_col_val_if_available(subject_node, "hmdb", line[6])
         else:
             assign_to_xrefs_if_available(subject_node, "hmdb", line[6])
-        if "pubchem_cid" not in subject_node and "kegg" not in subject_node and "drugbank" not in subject_node:
+        if "pubchem_cid" not in subject_node and "kegg_compound" not in subject_node and "drugbank" not in subject_node:
             assign_col_val_if_available(subject_node, "drugbank", line[7])
         else:
             assign_to_xrefs_if_available(subject_node, "drugbank", line[7])
 
-        # assign chemical id via a hierarchical order: 1.pubchem_cid, and 2.kegg
+        # assign chemical id via a hierarchical order: 1.pubchem_cid, and 2.kegg_compound
         if "pubchem_cid" in subject_node:
             subject_node["id"] = f"PUBCHEM.COMPOUND:{subject_node['pubchem_cid']}"
+        elif "kegg_compound" in subject_node:
+            subject_node["id"] = f"KEGG.COMPOUND:{subject_node['kegg_compound']}"
         else:
             subject_node["id"] = str(uuid.uuid4())
 
