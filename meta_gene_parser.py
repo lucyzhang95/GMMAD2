@@ -75,7 +75,7 @@ path = os.getcwd()
 file_path = os.path.join(path, "data", "meta_gene_net.csv")
 assert os.path.exists(file_path), f"The file {file_path} does not exist."
 
-entrezgene_ids = [int(line[14]) for line in line_generator(file_path) if "not available" not in line[14]]
+entrezgene_ids = [line[14] for line in line_generator(file_path) if "not available" not in line[14]]
 ensembl_ids = [line[13] for line in line_generator(file_path) if "not available" in line[14] and "not available" not in line[13]]
 uniprot_ids = [line[16] for line in line_generator(file_path) if "not available" in line[14] and "not available" in line[13]]
 gene_ids = entrezgene_ids + ensembl_ids + uniprot_ids
@@ -84,7 +84,7 @@ gene_ids = entrezgene_ids + ensembl_ids + uniprot_ids
 gene_name = {
     gene_id["query"]: gene_id
     for gene_id in get_gene_name(gene_ids)
-    if "notfound" not in gene_id.keys()
+    if "notfound" not in gene_id.keys() and "name" in gene_id.keys()
 }
 
 # taxon info using get_taxon_info() function
@@ -103,7 +103,7 @@ for line in line_generator(file_path):
         "type": "biolink:Gene"
     }
 
-    assign_col_val_if_available(object_node, "entrezgene", line[14], int)
+    assign_col_val_if_available(object_node, "entrezgene", line[14])
     assign_col_val_if_available(object_node, "protein_size", line[17], int)
 
     # add gene id via a hierarchical order: 1.entrezgene, 2.ensembl, 3.hgnc, and 4.uniportkb
@@ -132,11 +132,11 @@ for line in line_generator(file_path):
 
     # assign gene names by using biothings_client
     if "entrezgene" in object_node and object_node["entrezgene"] in gene_name:
-        object_node["name"] = gene_name[object_node["entrezgene"]]
+        object_node["name"] = gene_name[object_node["entrezgene"]]["name"]
     elif "ensembl" in object_node and object_node["ensembl"] in gene_name:
-        object_node["name"] = gene_name[object_node["ensembl"]]
+        object_node["name"] = gene_name[object_node["ensembl"]].get("name")
     elif "uniprotkb" in object_node and object_node["uniprotkb"] in gene_name:
-        object_node["name"] = gene_name[object_node["uniprotkb"]]
+        object_node["name"] = gene_name[object_node["uniprotkb"]]["name"]
 
     # divide annotation `line[18]` to description and reference
     # some entries have both, and some entries only have description
@@ -147,6 +147,8 @@ for line in line_generator(file_path):
             object_node["ref"] = descr_match.group(2).strip()
     else:
         object_node["description"] = line[18].strip()
+
+    print(object_node)
 
 
 
