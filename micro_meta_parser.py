@@ -125,18 +125,18 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
         assign_col_val_if_available(object_node, "smiles", line[18])
 
         if "pubchem_cid" in object_node:
-            assign_to_xrefs_if_available(object_node, "kegg", line[8])
+            assign_to_xrefs_if_available(object_node, "kegg_compound", line[8])
         else:
-            assign_col_val_if_available(object_node, "kegg", line[8])
-        if "pubchem_cid" not in object_node and "kegg" not in object_node:
+            assign_col_val_if_available(object_node, "kegg_compound", line[8])
+        if "pubchem_cid" not in object_node and "kegg_compound" not in object_node:
             assign_col_val_if_available(object_node, "hmdb", line[19])
         else:
             assign_to_xrefs_if_available(object_node, "hmdb", line[19])
 
         if "pubchem_cid" in object_node:
             object_node["id"] = f"PUBCHEM.COMPOUND:{object_node['pubchem_cid']}"
-        elif "kegg" in object_node:
-            object_node["id"] = f"KEGG.COMPOUND:{object_node['kegg']}"
+        elif "kegg_compound" in object_node:
+            object_node["id"] = f"KEGG.COMPOUND:{object_node['kegg_compound']}"
         elif "hmdb" in object_node:
             object_node["id"] = f"HMDB:{object_node['hmdb']}"
         else:
