@@ -117,13 +117,13 @@ def get_node_info(file_path):
 
         # assign ids via a hierarchical order: 1.entrezgene, 2.ensembl, 3.hgnc, and 4.uniprotkb
         if "entrezgene" in object_node:
-            object_node["id"] = f"NCBIGene: {object_node['entrezgene']}"
+            object_node["id"] = f"NCBIGene:{object_node['entrezgene']}"
         elif "ensembl" in object_node:
-            object_node["id"] = f"ENSEMBL: {object_node['ensembl']}"
+            object_node["id"] = f"ENSEMBL:{object_node['ensembl']}"
         elif "hgnc" in object_node:
-            object_node["id"] = f"HGNC: {object_node['hgnc']}"
+            object_node["id"] = f"HGNC:{object_node['hgnc']}"
         else:
-            object_node["id"] = f"UniProtKG: {object_node['uniprotkb']}"
+            object_node["id"] = f"UniProtKG:{object_node['uniprotkb']}"
 
         # assign gene names by using biothings_client
         if "entrezgene" in object_node and object_node["entrezgene"] in gene_name:
@@ -172,7 +172,7 @@ def get_node_info(file_path):
 
         # assign chemical id via a hierarchical order: 1.pubchem_cid, and 2.kegg
         if "pubchem_cid" in subject_node:
-            subject_node["id"] = f"PUBCHEM.COMPOUND: {subject_node['pubchem_cid']}"
+            subject_node["id"] = f"PUBCHEM.COMPOUND:{subject_node['pubchem_cid']}"
         else:
             subject_node["id"] = str(uuid.uuid4())
 
