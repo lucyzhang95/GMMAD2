@@ -236,12 +236,14 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
             association_node["qualifier"] = line[20].lower()
         if "elevated" in association_node.get("qualifier", ""):
             association_node["qualifier"] = association_node["qualifier"].replace(
-                "elevated", "increase"
+                "elevated", "increased"
             )
+            association_node["category"] = "biolink:ChemicalAffectsGeneAssociation"
         if "reduced" in association_node.get("qualifier", ""):
             association_node["qualifier"] = association_node["qualifier"].replace(
-                "reduced", "decrease"
+                "reduced", "decreased"
             )
+            association_node["category"] = "biolink:ChemicalAffectsGeneAssociation"
 
         # combine all the nodes together
         output_dict = {
