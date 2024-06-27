@@ -185,6 +185,10 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
         if "entrezgene" in object_node:
             object_node["entrezgene"] = int(object_node["entrezgene"])
 
+        # change object_node type to biolink:Protein if there is only uniprot exists
+        if "uniportkb" in object_node:
+            object_node["type"] = "biolink:Protein"
+
         # create subject node (metabolites)
         subject_node = {
             "id": None,
