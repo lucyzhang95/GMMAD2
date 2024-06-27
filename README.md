@@ -121,7 +121,7 @@ metabolite-gene record example:
       ]
    },
    "object":{
-      "id":"NCBIGene: 7498",
+      "id":"NCBIGene:7498",
       "symbol":"XDH",
       "type":"biolink:Gene",
       "entrezgene":7498,
@@ -136,7 +136,7 @@ metabolite-gene record example:
       "ref":"provided by RefSeq, Jan 2014"
    },
    "subject":{
-      "id":"PUBCHEM.COMPOUND: 6912",
+      "id":"PUBCHEM.COMPOUND:6912",
       "name":"Xylitol",
       "type":"biolink:SmallMolecule",
       "pubchem_cid":6912,
