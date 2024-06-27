@@ -34,7 +34,13 @@ column names with index:
 """
 
 
-def line_generator(in_file):
+def line_generator(in_file: str | os.PathLike) -> Iterator[list]:
+    """generates lines from a CSV file, yielding each line as a list of strings
+    This function opens the specified CSV file, skips the header row, and yields each subsequent line as a list of strings.
+
+    :param in_file: The path to the CSV file.
+    :return: An iterator that yields each line of the CSV file as a list of strings.
+    """
     with open(in_file, "r") as in_f:
         reader = csv.reader(in_f)
         next(reader)
@@ -43,6 +49,14 @@ def line_generator(in_file):
 
 
 def get_taxon_info(file_path) -> list:
+    """retrieves taxonomic information for a given list of taxon IDs from disease_species.csv
+
+    This function reads taxon IDs, removes duplicates, and queries taxonomic info from biothings_client
+    to retrieve detailed taxonomic information including scientific name, parent taxid, lineage, and rank.
+
+    :param file_path: Path to disease_species.csv containing the taxids.
+    :return: A list of dictionaries containing taxonomic information.
+    """
     taxids = [line[4] for line in line_generator(file_path)]
     taxids = set(taxids)
     t = biothings_client.get_client("taxon")
@@ -50,7 +64,15 @@ def get_taxon_info(file_path) -> list:
     return taxon_info
 
 
-def get_node_info(file_path):
+def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
+    """generates node dictionaries and parse through the disease_species.csv file
+    This function reads data, processes taxonomic information,
+    and generates subject, object and association nodes,
+    representing diseases and microbes, as well as their relationships.
+
+    :param file_path: Path to the disease_species.csv file
+    :return: An iterator of dictionaries containing node information.
+    """
     taxon_info = {
         int(taxon["query"]): taxon
         for taxon in get_taxon_info(file_path)
@@ -118,7 +140,13 @@ def get_node_info(file_path):
         yield output_dict
 
 
-def load_micro_disease_data():
+def load_micro_disease_data() -> Iterator[dict]:
+    """loads and yields microbe-disease data records from disease_species.csv file
+    This function constructs the file path to the disease_species.csv file,
+    retrieves node information using the `get_node_info` function, and yields each record.
+
+    :return: An iterator of dictionaries containing microbe-disease data.
+    """
     path = os.getcwd()
     file_path = os.path.join(path, "data", "disease_species.csv")
     assert os.path.exists(file_path), f"The file {file_path} does not exist."
