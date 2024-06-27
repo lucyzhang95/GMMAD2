@@ -289,11 +289,11 @@ def load_meta_gene_data() -> Iterator[dict]:
             yield rec
 
 
-if __name__ == "__main__":
-    _ids = []
-    meta_gene_data = load_meta_gene_data()
-    for obj in meta_gene_data:
-        print(obj)
-        _ids.append(obj["_id"])
-    print(f"total records: {len(_ids)}")
-    print(f"total records without duplicates: {len(set(_ids))}")
+# if __name__ == "__main__":
+#     _ids = []
+#     meta_gene_data = load_meta_gene_data()
+#     for obj in meta_gene_data:
+#         print(obj)
+#         _ids.append(obj["_id"])
+#     print(f"total records: {len(_ids)}")
+#     print(f"total records without duplicates: {len(set(_ids))}")
