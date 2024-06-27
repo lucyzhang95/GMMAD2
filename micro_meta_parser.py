@@ -33,8 +33,14 @@ column names with index:
 """
 
 
-def line_generator(file_path):
-    with open(file_path, "r") as in_f:
+def line_generator(in_file: str | os.PathLike) -> Iterator[list]:
+    """generates lines from a CSV file, yielding each line as a list of strings
+    This function opens the specified CSV file, skips the header row, and yields each subsequent line as a list of strings.
+
+    :param in_file: The path to the CSV file.
+    :return: An iterator that yields each line of the CSV file as a list of strings.
+    """
+    with open(in_file, "r") as in_f:
         reader = csv.reader(in_f)
         # skip the header
         next(reader)
@@ -42,12 +48,34 @@ def line_generator(file_path):
             yield line
 
 
-def assign_col_val_if_available(node, key, val, transform=None):
+def assign_col_val_if_available(node: dict, key: str, val: str | int, transform=None):
+    """assigns a value to a specified key in a dictionary if the value is available and not equal to "not available"
+    This function updates the given dictionary with the provided key and value.
+    It can also transform the value using a specified function before assigning it.
+
+    :param node: The dictionary to be updated.
+    :param key: The key to be assigned the value in the dictionary.
+    :param val: The value to be assigned to the key in the dictionary.
+    :param transform: An optional function to transform the value before assignment. If None, the value is assigned as is.
+    :return: None
+    """
     if val and val != "not available":
         node[key] = transform(val) if transform else val
 
 
-def assign_to_xrefs_if_available(node, key, val, transform=None):
+def assign_to_xrefs_if_available(node: dict, key: str, val: str | int, transform=None):
+    """assigns a value to the 'xrefs' sub-dictionary of a given dictionary
+    This function checks if the 'xrefs' key exists in the given dictionary.
+    If not, it initializes 'xrefs' as an empty dictionary.
+    Then, it assigns the provided value to the specified key within the 'xrefs' dictionary
+    It can also transform the value using a specified function.
+
+    :param node: The dictionary to be updated.
+    :param key: The key to be assigned the value in the 'xrefs' sub-dictionary.
+    :param val: The value to be assigned to the key in the 'xrefs' sub-dictionary.
+    :param transform: An optional function to transform the value before assignment. If None, the value is assigned as is.
+    :return: None
+    """
     if val and val != "not available":
         if "xrefs" not in node:
             node["xrefs"] = {}
@@ -55,7 +83,14 @@ def assign_to_xrefs_if_available(node, key, val, transform=None):
         node["xrefs"][key] = transform(val) if transform else val
 
 
-def get_taxon_info(file_path) -> Iterator[dict]:
+def get_taxon_info(file_path: str | os.PathLike) -> list:
+    """retrieves taxonomic information for a given list of taxon IDs from micro_metabolic.csv
+    This function reads taxon IDs, removes duplicates, and queries taxonomic info from biothings_client
+    to retrieve detailed taxonomic information including scientific name, parent taxid, lineage, and rank.
+
+    :param file_path: Path to micro_metabolic.csv containing the taxids.
+    :return: A list of dictionaries containing taxonomic information.
+    """
     taxids = [line[9] for line in line_generator(file_path)]
     taxids = set(taxids)
     t = biothings_client.get_client("taxon")
@@ -63,7 +98,14 @@ def get_taxon_info(file_path) -> Iterator[dict]:
     return taxon_info
 
 
-def get_node_info(file_path):
+def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
+    """generates node information from micro_metabolic.csv.
+    This function reads data from micro_metabolic.csv, processes taxonomic information,
+    and generates nodes representing metabolites and microbes, including their relationships.
+
+    :param file_path: Path to the micro_metabolic.csv file
+    :return: An iterator of dictionaries containing node information.
+    """
     taxon_info = {
         int(taxon["query"]): taxon
         for taxon in get_taxon_info(file_path)
@@ -158,7 +200,13 @@ def get_node_info(file_path):
         yield output_dict
 
 
-def load_micro_meta_data():
+def load_micro_meta_data() -> Iterator[dict]:
+    """loads and yields unique microbe-metabolite data records from micro_metabolic.csv file
+    This function constructs the file path to the micro_metabolic.csv file,
+    retrieves node information using the `get_node_info` function, and yields unique records based on `_id`.
+
+    :return: An iterator of dictionaries containing microbe-metabolite data.
+    """
     path = os.getcwd()
     file_path = os.path.join(path, "data", "micro_metabolic.csv")
     assert os.path.exists(file_path), f"The file {file_path} does not exist."
@@ -171,17 +219,17 @@ def load_micro_meta_data():
             yield rec
 
 
-if __name__ == "__main__":
-    # from collections import Counter
-    micro_meta_data = load_micro_meta_data()
-    # type_list = [obj["subject"]["type"] for obj in micro_meta_data]
-    # type_counts = Counter(type_list)
-    # for value, count in type_counts.items():
-    #     print(f"{value}: {count}")
+# if __name__ == "__main__":
+# from collections import Counter
+# micro_meta_data = load_micro_meta_data()
+# type_list = [obj["subject"]["type"] for obj in micro_meta_data]
+# type_counts = Counter(type_list)
+# for value, count in type_counts.items():
+#     print(f"{value}: {count}")
 
-    _ids = []
-    for obj in micro_meta_data:
-        print(obj)
-        _ids.append(obj["_id"])
-    print(f"total records: {len(_ids)}")
-    print(f"total records without duplicates: {len(set(_ids))}")
+# _ids = []
+# for obj in micro_meta_data:
+#     print(obj)
+#     _ids.append(obj["_id"])
+# print(f"total records: {len(_ids)}")
+# print(f"total records without duplicates: {len(set(_ids))}")
