@@ -1,10 +1,10 @@
 import csv
 import os
-from collections.abc import Iterator
+import re
 import uuid
+from collections.abc import Iterator
 
 import biothings_client
-import re
 
 """
 column names with index:
@@ -60,14 +60,26 @@ def assign_to_xrefs_if_available(node, key, val, transform=None):
 def get_gene_name(gene_ids):
     gene_ids = set(gene_ids)
     t = biothings_client.get_client("gene")
-    gene_names = t.querymany(gene_ids, scopes=["entrezgene", "ensembl.gene", "uniprot"], fields=["name"])
+    gene_names = t.querymany(
+        gene_ids, scopes=["entrezgene", "ensembl.gene", "uniprot"], fields=["name"]
+    )
     return gene_names
 
 
 def get_node_info(file_path):
-    entrezgene_ids = [line[14] for line in line_generator(file_path) if "not available" not in line[14]]
-    ensembl_ids = [line[13] for line in line_generator(file_path) if "not available" in line[14] and "not available" not in line[13]]
-    uniprot_ids = [line[16] for line in line_generator(file_path) if "not available" in line[14] and "not available" in line[13]]
+    entrezgene_ids = [
+        line[14] for line in line_generator(file_path) if "not available" not in line[14]
+    ]
+    ensembl_ids = [
+        line[13]
+        for line in line_generator(file_path)
+        if "not available" in line[14] and "not available" not in line[13]
+    ]
+    uniprot_ids = [
+        line[16]
+        for line in line_generator(file_path)
+        if "not available" in line[14] and "not available" in line[13]
+    ]
     gene_ids = entrezgene_ids + ensembl_ids + uniprot_ids
 
     # get gene name using get_gene_name() function
@@ -80,11 +92,7 @@ def get_node_info(file_path):
     # parse the data
     for line in line_generator(file_path):
         # create object node (genes)
-        object_node = {
-            "id": None,
-            "symbol": line[12],
-            "type": "biolink:Gene"
-        }
+        object_node = {"id": None, "symbol": line[12], "type": "biolink:Gene"}
 
         assign_col_val_if_available(object_node, "entrezgene", line[14])
         assign_col_val_if_available(object_node, "protein_size", line[17], int)
@@ -98,7 +106,11 @@ def get_node_info(file_path):
             assign_col_val_if_available(object_node, "hgnc", line[15], int)
         else:
             assign_to_xrefs_if_available(object_node, "hgnc", line[15], int)
-        if "entrezgene" not in object_node and "ensembl" not in object_node and "hgnc" not in object_node:
+        if (
+            "entrezgene" not in object_node
+            and "ensembl" not in object_node
+            and "hgnc" not in object_node
+        ):
             assign_col_val_if_available(object_node, "uniprotkb", line[16])
         else:
             assign_to_xrefs_if_available(object_node, "uniprotkb", line[16])
@@ -165,9 +177,7 @@ def get_node_info(file_path):
             subject_node["id"] = str(uuid.uuid4())
 
         # association node has the qualifier, reference and source of metabolites
-        association_node = {
-            "predicate": "biolink:associated_with"
-        }
+        association_node = {"predicate": "biolink:associated_with"}
 
         assign_col_val_if_available(association_node, "score", line[19])
         assign_col_val_if_available(association_node, "pmid", line[21], int)
@@ -179,9 +189,13 @@ def get_node_info(file_path):
         if line[20] and line[20] != "Unknown":
             association_node["qualifier"] = line[20].lower()
         if "elevated" in association_node.get("qualifier", ""):
-            association_node["qualifier"] = association_node["qualifier"].replace("elevated", "increase")
+            association_node["qualifier"] = association_node["qualifier"].replace(
+                "elevated", "increase"
+            )
         if "reduced" in association_node.get("qualifier", ""):
-            association_node["qualifier"] = association_node["qualifier"].replace("reduced", "decrease")
+            association_node["qualifier"] = association_node["qualifier"].replace(
+                "reduced", "decrease"
+            )
 
         # combine all the nodes together
         output_dict = {
@@ -223,17 +237,3 @@ def load_meta_gene_data():
 #         _ids.append(obj["_id"])
 #     print(f"total records: {len(_ids)}")
 #     print(f"total records without duplicates: {len(set(_ids))}")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
