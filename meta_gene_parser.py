@@ -179,6 +179,7 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
         elif "uniprotkb" in object_node and object_node["uniprotkb"] in gene_name:
             object_node["name"] = gene_name[object_node["uniprotkb"]]["name"]
 
+        # add gene summary to the object_node
         if line[18]:
             object_node["summary"] = line[18]
 
