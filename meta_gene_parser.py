@@ -179,7 +179,7 @@ def get_node_info(file_path):
         # association node has the qualifier, reference and source of metabolites
         association_node = {"predicate": "biolink:associated_with"}
 
-        assign_col_val_if_available(association_node, "score", line[19], int)
+        assign_col_val_if_available(association_node, "score", line[19], float)
         assign_col_val_if_available(association_node, "pmid", line[21], int)
 
         if line[9] and line[9] != "Unknown":
@@ -229,11 +229,11 @@ def load_meta_gene_data():
             yield rec
 
 
-# if __name__ == "__main__":
-#     _ids = []
-#     meta_gene_data = load_meta_gene_data()
-#     for obj in meta_gene_data:
-#         print(obj)
-#         _ids.append(obj["_id"])
-#     print(f"total records: {len(_ids)}")
-#     print(f"total records without duplicates: {len(set(_ids))}")
+if __name__ == "__main__":
+    _ids = []
+    meta_gene_data = load_meta_gene_data()
+    for obj in meta_gene_data:
+        print(obj)
+        _ids.append(obj["_id"])
+    print(f"total records: {len(_ids)}")
+    print(f"total records without duplicates: {len(set(_ids))}")
