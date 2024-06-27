@@ -179,15 +179,8 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
         elif "uniprotkb" in object_node and object_node["uniprotkb"] in gene_name:
             object_node["name"] = gene_name[object_node["uniprotkb"]]["name"]
 
-        # divide annotation `line[18]` to description and reference
-        # some entries have both, and some entries only have description
-        descr_match = re.search(r"(.+?)\s*\[(.+)\]$", line[18])
-        if "[" in line[18]:
-            if descr_match:
-                object_node["description"] = descr_match.group(1).strip()
-                object_node["ref"] = descr_match.group(2).strip()
-        else:
-            object_node["description"] = line[18].strip()
+        if line[18]:
+            object_node["summary"] = line[18]
 
         # convert entrezgene to integers
         if "entrezgene" in object_node:
