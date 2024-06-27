@@ -172,12 +172,10 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
             object_node["id"] = f"UniProtKG:{object_node['uniprotkb']}"
 
         # assign gene names by using biothings_client
-        if "entrezgene" in object_node and object_node["entrezgene"] in gene_name:
-            object_node["name"] = gene_name[object_node["entrezgene"]]["name"]
-        elif "ensemblgene" in object_node and object_node["ensemblgene"] in gene_name:
-            object_node["name"] = gene_name[object_node["ensemblgene"]].get("name")
-        elif "uniprotkb" in object_node and object_node["uniprotkb"] in gene_name:
-            object_node["name"] = gene_name[object_node["uniprotkb"]]["name"]
+        for key in ("entrezgene", "ensemblgene", "uniprotkb"):
+            if key in object_node and object_node[key] in gene_name:
+                object_node["name"] = gene_name[object_node[key]].get("name")
+                break
 
         # add gene summary to the object_node
         if line[18]:
