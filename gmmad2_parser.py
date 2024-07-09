@@ -499,7 +499,7 @@ def load_meta_gene_data() -> Iterator[dict]:
             yield rec
 
 
-def load_data() -> Iterator[dict]:
+def load_data(data_path) -> Iterator[dict]:
     """loads and combines all 3 relationships among microbes, diseases, and metabolites in GMMAD2 database
     sorts them by their '_id' field, and yields each document in sorted order.
 
@@ -511,6 +511,7 @@ def load_data() -> Iterator[dict]:
     The documents from these sources are combined into a single list,
     sorted by the '_id' field, and then yielded one by one.
 
+    :param data_path: for biothings_cli to function
     :return: An iterator that yields each sorted document as a dictionary.
     """
     from itertools import chain
