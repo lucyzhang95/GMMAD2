@@ -1,0 +1,23 @@
+{
+  "version": "0.3",
+  "__metadata__": {
+    "url": "http://guolab.whu.edu.cn/GMMAD2/home/",
+    "description": "Gut Microbial Metabolite Association with Disease"
+  },
+  "display_name": "GMMAD",
+  "biothing_type": "association",
+  "requires": [],
+  "dumper": {
+    "data_url": [
+      "http://guolab.whu.edu.cn/static2/file/micro_metabolic.csv",
+      "http://guolab.whu.edu.cn/static2/file/disease_species.csv",
+      "http://guolab.whu.edu.cn/static2/file/meta_gene_net.csv"
+    ],
+    "uncompress" : false,
+    "release": "version:get_release"
+  },
+  "uploader": {
+    "parser": "gmmad2_parser:load_data",
+    "on_duplicates": "error"
+  }
+}
