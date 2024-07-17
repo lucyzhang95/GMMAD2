@@ -531,10 +531,16 @@ def load_data(data_path) -> Iterator[dict]:
 
 
 # if __name__ == "__main__":
+#     import pickle
 #     data_list = []
 #     data = load_data()
-#     for obj in data:
-#         data_list.append(obj["_id"])
 #
-#     print("total records", len(data_list))
-#     print("total records without duplications", len(set(data_list)))
+#     parser_op = [obj for obj in data]
+#     with open("data/gmmad2_data.json", "wb") as handle:
+#         pickle.dump(parser_op, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    # for obj in data:
+    #     data_list.append(obj["_id"])
+
+    # print("total records", len(data_list))
+    # print("total records without duplications", len(set(data_list)))
