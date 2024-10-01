@@ -1,9 +1,24 @@
+from collections.abc import Iterator
+from itertools import chain
+from operator import itemgetter
 import csv
 import os
+import pathlib
 import uuid
-from collections.abc import Iterator
+import zipfile
 
 import biothings_client
+
+from biothings import config
+
+
+def plugin_directory() -> pathlib.Path:
+    """
+    Returns the plugin directory for accessing local data
+    """
+    plugin_name = "GMMAD2_data"
+    plugin_path = pathlib.Path(config.DATA_PLUGIN_FOLDER) / plugin_name
+    return plugin_path.resolve().absolute()
 
 
 def line_generator(in_file: str | os.PathLike) -> Iterator[list]:
@@ -135,10 +150,7 @@ def get_micro_meta_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
             assign_to_xrefs_if_available(object_node, "kegg_compound", line[8])
         else:
             assign_col_val_if_available(object_node, "kegg_compound", line[8])
-        if (
-            "pubchem_cid" not in object_node
-            and "kegg_compound" not in object_node
-        ):
+        if "pubchem_cid" not in object_node and "kegg_compound" not in object_node:
             assign_col_val_if_available(object_node, "hmdb", line[19])
         else:
             assign_to_xrefs_if_available(object_node, "hmdb", line[19])
@@ -146,9 +158,7 @@ def get_micro_meta_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
         # TODO: some metabolite identifiers start with "G" and they belong to kegg_glycan
         # TODO: need to have one more id entry in object node
         if "pubchem_cid" in object_node:
-            object_node["id"] = (
-                f"PUBCHEM.COMPOUND:{object_node['pubchem_cid']}"
-            )
+            object_node["id"] = f"PUBCHEM.COMPOUND:{object_node['pubchem_cid']}"
         elif "kegg_compound" in object_node:
             object_node["id"] = f"KEGG.COMPOUND:{object_node['kegg_compound']}"
         elif "hmdb" in object_node:
@@ -170,15 +180,13 @@ def get_micro_meta_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
             subject_node["id"] = str(uuid.uuid4())
 
         if subject_node.get("taxid") in taxon_info:
-            subject_node["scientific_name"] = taxon_info[
-                subject_node["taxid"]
-            ]["scientific_name"]
+            subject_node["scientific_name"] = taxon_info[subject_node["taxid"]][
+                "scientific_name"
+            ]
             subject_node["parent_taxid"] = taxon_info[subject_node["taxid"]][
                 "parent_taxid"
             ]
-            subject_node["lineage"] = taxon_info[subject_node["taxid"]][
-                "lineage"
-            ]
+            subject_node["lineage"] = taxon_info[subject_node["taxid"]]["lineage"]
             subject_node["rank"] = taxon_info[subject_node["taxid"]]["rank"]
 
         # categorize subject microbial super kingdom type
@@ -237,8 +245,9 @@ def load_micro_meta_data() -> Iterator[dict]:
 
     :return: An iterator of dictionaries containing microbe-metabolite data.
     """
-    path = os.getcwd()
-    file_path = os.path.join(path, "data", "micro_metabolic.csv")
+    plugin_path = plugin_directory()
+    data_path = pathlib.Path(plugin_path) / "data"
+    file_path = data_path.joinpath("micro_metabolic.csv")
     assert os.path.exists(file_path), f"The file {file_path} does not exist."
 
     dup_ids = set()
@@ -280,7 +289,12 @@ def get_micro_disease_node_info(
         }
 
         # create subject node (microbes)
-        taxid = int(line[4])
+        try:
+            taxid = int(line[4])
+        except Exception as gen_exc:
+            breakpoint()
+            pass
+
         subject_node = {
             "id": f"taxid:{taxid}",
             "taxid": taxid,
@@ -288,15 +302,13 @@ def get_micro_disease_node_info(
             "type": "biolink:OrganismalEntity",
         }
         if subject_node["taxid"] in taxon_info:
-            subject_node["scientific_name"] = taxon_info[
-                subject_node["taxid"]
-            ]["scientific_name"]
+            subject_node["scientific_name"] = taxon_info[subject_node["taxid"]][
+                "scientific_name"
+            ]
             subject_node["parent_taxid"] = taxon_info[subject_node["taxid"]][
                 "parent_taxid"
             ]
-            subject_node["lineage"] = taxon_info[subject_node["taxid"]][
-                "lineage"
-            ]
+            subject_node["lineage"] = taxon_info[subject_node["taxid"]]["lineage"]
             subject_node["rank"] = taxon_info[subject_node["taxid"]]["rank"]
 
         # categorize subject microbial super kingdom type
@@ -347,8 +359,9 @@ def load_micro_disease_data() -> Iterator[dict]:
 
     :return: An iterator of dictionaries containing microbe-disease data.
     """
-    path = os.getcwd()
-    file_path = os.path.join(path, "data", "disease_species.csv")
+    plugin_path = plugin_directory()
+    data_path = pathlib.Path(plugin_path) / "data"
+    file_path = data_path.joinpath("disease_species.csv")
     assert os.path.exists(file_path), f"The file {file_path} does not exist."
 
     recs = get_micro_disease_node_info(file_path)
@@ -405,10 +418,7 @@ def get_meta_gene_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
             assign_to_xrefs_if_available(object_node, "ensemblgene", line[13])
         else:
             assign_col_val_if_available(object_node, "ensemblgene", line[13])
-        if (
-            "entrezgene" not in object_node
-            and "ensemblgene" not in object_node
-        ):
+        if "entrezgene" not in object_node and "ensemblgene" not in object_node:
             assign_col_val_if_available(object_node, "hgnc", line[15], int)
         else:
             assign_to_xrefs_if_available(object_node, "hgnc", line[15], int)
@@ -463,15 +473,10 @@ def get_meta_gene_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
 
         # add chemicals via a hierarchical order: 1.pubchem_cid, 2.kegg_compound, 3.hmdb, and 4.drugbank
         if "pubchem_cid" in subject_node:
-            assign_to_xrefs_if_available(
-                subject_node, "kegg_compound", line[5]
-            )
+            assign_to_xrefs_if_available(subject_node, "kegg_compound", line[5])
         else:
             assign_col_val_if_available(subject_node, "kegg_compound", line[5])
-        if (
-            "pubchem_cid" not in subject_node
-            and "kegg_compound" not in subject_node
-        ):
+        if "pubchem_cid" not in subject_node and "kegg_compound" not in subject_node:
             assign_col_val_if_available(subject_node, "hmdb", line[6])
         else:
             assign_to_xrefs_if_available(subject_node, "hmdb", line[6])
@@ -486,13 +491,9 @@ def get_meta_gene_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
 
         # assign chemical id via a hierarchical order: 1.pubchem_cid, and 2.kegg_compound
         if "pubchem_cid" in subject_node:
-            subject_node["id"] = (
-                f"PUBCHEM.COMPOUND:{subject_node['pubchem_cid']}"
-            )
+            subject_node["id"] = f"PUBCHEM.COMPOUND:{subject_node['pubchem_cid']}"
         elif "kegg_compound" in subject_node:
-            subject_node["id"] = (
-                f"KEGG.COMPOUND:{subject_node['kegg_compound']}"
-            )
+            subject_node["id"] = f"KEGG.COMPOUND:{subject_node['kegg_compound']}"
         else:
             subject_node["id"] = str(uuid.uuid4())
 
@@ -513,19 +514,15 @@ def get_meta_gene_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
         if line[20] and line[20] != "Unknown":
             association_node["qualifier"] = line[20].lower()
         if "elevated" in association_node.get("qualifier", ""):
-            association_node["qualifier"] = association_node[
-                "qualifier"
-            ].replace("elevated", "increased")
-            association_node["category"] = (
-                "biolink:ChemicalAffectsGeneAssociation"
+            association_node["qualifier"] = association_node["qualifier"].replace(
+                "elevated", "increased"
             )
+            association_node["category"] = "biolink:ChemicalAffectsGeneAssociation"
         if "reduced" in association_node.get("qualifier", ""):
-            association_node["qualifier"] = association_node[
-                "qualifier"
-            ].replace("reduced", "decreased")
-            association_node["category"] = (
-                "biolink:ChemicalAffectsGeneAssociation"
+            association_node["qualifier"] = association_node["qualifier"].replace(
+                "reduced", "decreased"
             )
+            association_node["category"] = "biolink:ChemicalAffectsGeneAssociation"
 
         # combine all the nodes together
         output_dict = {
@@ -556,8 +553,9 @@ def load_meta_gene_data() -> Iterator[dict]:
 
     :return: An iterator of unique dictionaries containing meta gene data.
     """
-    path = os.getcwd()
-    file_path = os.path.join(path, "data", "meta_gene_net.csv")
+    plugin_path = plugin_directory()
+    data_path = pathlib.Path(plugin_path) / "data"
+    file_path = data_path.joinpath("meta_gene_net.csv")
     assert os.path.exists(file_path), f"The file {file_path} does not exist."
 
     dup_ids = set()
@@ -584,20 +582,22 @@ def load_data(data_path) -> Iterator[dict]:
     :param data_path: for biothings_cli to function
     :return: An iterator that yields each sorted document as a dictionary.
     """
-    from itertools import chain
-    from operator import itemgetter
+    plugin_path = plugin_directory()
+    data_path = pathlib.Path(plugin_path) / "data"
+    gmmad2_zip = data_path / "gmmad2.zip"
+    with zipfile.ZipFile(gmmad2_zip, "r") as zip_ref:
+        zip_ref.extractall(data_path)
 
     doc_list = list(
         chain(
             load_micro_meta_data(),
-            load_micro_disease_data(),
+            # load_micro_disease_data(),
             load_meta_gene_data(),
         )
     )
     sorted_docs = sorted(doc_list, key=itemgetter("_id"))
 
-    for doc in sorted_docs:
-        yield doc
+    yield from sorted_docs
 
 
 # if __name__ == "__main__":

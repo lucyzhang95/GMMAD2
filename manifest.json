@@ -9,9 +9,7 @@
   "requires": [],
   "dumper": {
     "data_url": [
-      "http://guolab.whu.edu.cn/static2/file/micro_metabolic.csv",
-      "http://guolab.whu.edu.cn/static2/file/disease_species.csv",
-      "http://guolab.whu.edu.cn/static2/file/meta_gene_net.csv"
+      "https://www.gnu.org/software/smalltalk/manual/gst.html"
     ],
     "uncompress" : false,
     "release": "version:get_release"

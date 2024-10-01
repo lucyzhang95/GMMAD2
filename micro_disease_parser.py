@@ -60,7 +60,9 @@ def get_taxon_info(file_path) -> list:
     taxids = [line[4] for line in line_generator(file_path)]
     taxids = set(taxids)
     t = biothings_client.get_client("taxon")
-    taxon_info = t.gettaxa(taxids, fields=["scientific_name", "parent_taxid", "lineage", "rank"])
+    taxon_info = t.gettaxa(
+        taxids, fields=["scientific_name", "parent_taxid", "lineage", "rank"]
+    )
     return taxon_info
 
 
@@ -97,8 +99,12 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
             "type": "biolink:OrganismalEntity",
         }
         if subject_node["taxid"] in taxon_info:
-            subject_node["scientific_name"] = taxon_info[subject_node["taxid"]]["scientific_name"]
-            subject_node["parent_taxid"] = taxon_info[subject_node["taxid"]]["parent_taxid"]
+            subject_node["scientific_name"] = taxon_info[subject_node["taxid"]][
+                "scientific_name"
+            ]
+            subject_node["parent_taxid"] = taxon_info[subject_node["taxid"]][
+                "parent_taxid"
+            ]
             subject_node["lineage"] = taxon_info[subject_node["taxid"]]["lineage"]
             subject_node["rank"] = taxon_info[subject_node["taxid"]]["rank"]
 

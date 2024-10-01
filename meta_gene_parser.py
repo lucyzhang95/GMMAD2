@@ -49,7 +49,9 @@ def line_generator(in_file: str | os.PathLike) -> Iterator[list]:
             yield line
 
 
-def assign_col_val_if_available(node: dict, key: str, val: str | int | float, transform=None):
+def assign_col_val_if_available(
+    node: dict, key: str, val: str | int | float, transform=None
+):
     """assigns a value to a specified key in a dictionary if the value is available and not equal to "not available"
     This function updates the given dictionary with the provided key and value.
     It can also transform the value using a specified function before assigning it.
@@ -64,7 +66,9 @@ def assign_col_val_if_available(node: dict, key: str, val: str | int | float, tr
         node[key] = transform(val) if transform else val
 
 
-def assign_to_xrefs_if_available(node: dict, key: str, val: str | int | float, transform=None):
+def assign_to_xrefs_if_available(
+    node: dict, key: str, val: str | int | float, transform=None
+):
     """assigns a value to the 'xrefs' sub-dictionary of a given dictionary
     This function checks if the 'xrefs' key exists in the given dictionary.
     If not, it initializes 'xrefs' as an empty dictionary.
@@ -113,7 +117,9 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
 
     # gather gene ids from the file
     entrezgene_ids = [
-        line[14] for line in line_generator(file_path) if "not available" not in line[14]
+        line[14]
+        for line in line_generator(file_path)
+        if "not available" not in line[14]
     ]
     ensembl_ids = [
         line[13]
@@ -233,9 +239,13 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
         assign_col_val_if_available(association_node, "pmid", line[21], int)
 
         if line[9] and line[9] != "Unknown":
-            association_node["sources"] = [src.strip().lower() for src in line[9].split(";")]
+            association_node["sources"] = [
+                src.strip().lower() for src in line[9].split(";")
+            ]
         if line[22] and line[22] != "Unknown":
-            association_node["infores"] = [src.strip().lower() for src in line[22].split(",")]
+            association_node["infores"] = [
+                src.strip().lower() for src in line[22].split(",")
+            ]
         if line[20] and line[20] != "Unknown":
             association_node["qualifier"] = line[20].lower()
         if "elevated" in association_node.get("qualifier", ""):

@@ -28,7 +28,9 @@ def csv_data_overview(in_file, file_name):
         print(f"Column: {column}")
         print(f"Number of unique values: {len(unique_values)}")
         digit_value = [val for val in unique_values if col_value_contains_digits(val)]
-        other_value = [val for val in unique_values if not col_value_contains_digits(val)]
+        other_value = [
+            val for val in unique_values if not col_value_contains_digits(val)
+        ]
         if len(unique_values) > 10:
             print(f"Unique values contain digits: {digit_value[:9]}")
             print(f"Unique values no digits: {other_value[:9]}")
