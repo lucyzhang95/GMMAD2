@@ -94,7 +94,7 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
             "id": f"taxid:{taxid}",
             "taxid": taxid,
             "name": line[2].lower(),
-            "type": "biolink:OrganismalEntity",
+            "type": "biolink:OrganismTaxon",
         }
         if subject_node["taxid"] in taxon_info:
             subject_node["scientific_name"] = taxon_info[subject_node["taxid"]]["scientific_name"]
@@ -102,7 +102,7 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
             subject_node["lineage"] = taxon_info[subject_node["taxid"]]["lineage"]
             subject_node["rank"] = taxon_info[subject_node["taxid"]]["rank"]
 
-        # categorize subject microbial super kingdom type
+        # assign subject microbial super kingdom type
         if "lineage" in subject_node:
             if 2 in subject_node["lineage"]:
                 subject_node["type"] = "biolink:Bacterium"
@@ -113,7 +113,7 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
             elif 2157 in subject_node["lineage"]:
                 subject_node["type"] = "biolink:Archaea"
             else:
-                subject_node["type"] = "biolink:OrganismalEntity"
+                subject_node["type"] = "biolink:OrganismTaxon"
 
         # create association node
         # includes disease and health sample sizes, microbial abundance mean, median, sd, qualifier
@@ -155,28 +155,32 @@ def load_micro_disease_data() -> Iterator[dict]:
 
     recs = get_node_info(file_path)
     for rec in recs:
-        yield rec
+        # exclude records with sample size == 0
+        if (
+            int(rec["association"].get("disease_sample_size")) != 0
+            and int(rec["association"].get("healthy_sample_size")) != 0
+        ):
+            yield rec
 
 
 # if __name__ == "__main__":
-#     from collections import Counter
-#
 #     data = load_micro_disease_data()
+# _ids = []
+# for obj in data:
+#     print(obj)
+#     _ids.append(obj["_id"])
+# print(f"total records: {len(_ids)}")
+# print(f"total records without duplicates: {len(set(_ids))}")
+
+# from collections import Counter
 #
-#     type_list = [obj["subject"]["type"] for obj in data]
-#     type_counts = Counter(type_list)
+# type_list = [obj["subject"]["type"] for obj in data]
+# type_counts = Counter(type_list) # count microorganism type
 #
-#     for value, count in type_counts.items():
-#         print(f"{value}: {count}")
+# for value, count in type_counts.items():
+#     print(f"{value}: {count}")
 #
-#     rank_list = [obj["subject"]["rank"] for obj in data if "rank" in obj["subject"]]
-#     rank_counts = Counter(rank_list)
-#     for value, count in rank_counts.items():
-#         print(f"{value}: {count}")
-#
-#     _ids = []
-#     for obj in data:
-#         # print(obj)
-#         _ids.append(obj["_id"])
-#     print(f"total records: {len(_ids)}")
-#     print(f"total records without duplicates: {len(set(_ids))}")
+# rank_list = [obj["subject"]["rank"] for obj in data if "rank" in obj["subject"]]
+# rank_counts = Counter(rank_list)
+# for value, count in rank_counts.items():
+#     print(f"{value}: {count}")
