@@ -41,6 +41,7 @@ def csv_data_overview(in_file, file_name):
 
 if __name__ == "__main__":
     # csv_data_overview("data", "micro_metabolic.csv")
-    # disease_meta.csv contains predictions, so better not to process it now, but can use for comparison later
+    ## disease_meta.csv contains predictions, so better not to process it now, but can use for comparison later
     # csv_data_overview("data", "disease_meta.csv")
-    csv_data_overview("data", "meta_gene_net.csv")
+    # csv_data_overview("data", "meta_gene_net.csv")
+    csv_data_overview("data", "disease_species.csv")
