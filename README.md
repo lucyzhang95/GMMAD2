@@ -2,7 +2,8 @@
 Parser for GMMDA2 database (microbes-metabolites, microbes-diseases, and metabolites-diseases)
 ***
 
-microbe-metabolite record example: <br>
+## Microbe-Metabolite
+Record example: <br>
 ```ruby
 {
    "_id":"264203_associated_with_6287",
@@ -54,46 +55,56 @@ microbe-metabolite record example: <br>
 }
 ```
 
-microbe-disease record example: <br>
+## Microbe-Disease
+Total record before excluding sample size is 0: 508141
+<br>
+Total record after excluding sample size is 0: 121285
+<br>
+Edge reduced by 386,856 <br>
+Organism Type Count: <br>
+Bacterium: 119590 <br>
+OrganismTaxon: 830 <br>
+Archaea: 865 <br>
+
+Record example: <br>
 ```ruby
 {
-   "_id":"1873459_OrganismalEntityAsAModelOfDiseaseAssociation_D003967",
+   "_id":"1755642_OrganismalEntityAsAModelOfDiseaseAssociation_D003093",
    "association":{
       "predicate":"OrganismalEntityAsAModelOfDiseaseAssociation",
       "control_name":"healthy control",
       "qualifier":"decrease",
-      "qualifier_ratio":"-0.00218686",
-      "disease_sample_size":"0",
-      "disease_abundance_mean":"0",
-      "disease_abundance_median":"0",
-      "disease_abundance_sd":"0",
-      "healthy_sample_size":"2",
-      "healthy_abundance_mean":"0.00218686",
-      "healthy_abundance_median":"0.00218686",
-      "healthy_abundance_sd":"0.001611793"
+      "qualifier_ratio":"-0.001222806",
+      "disease_sample_size":"3",
+      "disease_abundance_mean":"0.000544065",
+      "disease_abundance_median":"0.000506614",
+      "disease_abundance_sd":"0.000351942",
+      "healthy_sample_size":"233",
+      "healthy_abundance_mean":"0.002674384",
+      "healthy_abundance_median":"0.00172942",
+      "healthy_abundance_sd":"0.002712906"
    },
    "object":{
-      "id":"MESH:D003967",
-      "name":"diarrhea",
-      "mesh":"D003967",
+      "id":"MESH:D003093",
+      "name":"colitis, ulcerative",
+      "mesh":"D003093",
       "type":"biolink:Disease",
-      "description":"An increased liquidity or decreased consistency of FECES, such as running stool. Fecal consistency is related to the ratio of water-holding capacity of insoluble solids to total water, rather than the amount of water present. Diarrhea is not hyperdefecation or increased fecal weight."
+      "description":"Inflammation of the COLON that is predominantly confined to the MUCOSA. Its major symptoms include DIARRHEA, rectal BLEEDING, the passage of MUCUS, and ABDOMINAL PAIN."
    },
    "subject":{
-      "id":"taxid:1873459",
-      "taxid":1873459,
-      "name":"blastococcus sp.",
+      "id":"taxid:1755642",
+      "taxid":1755642,
+      "name":"lachnospiraceae bacterium mc_35",
       "type":"biolink:Bacterium",
-      "scientific_name":"blastococcus sp.",
-      "parent_taxid":2619396,
+      "scientific_name":"lachnospiraceae bacterium mc_35",
+      "parent_taxid":186928,
       "lineage":[
-         1873459,
-         2619396,
-         38501,
-         85030,
-         1643682,
-         1760,
-         201174,
+         1755642,
+         186928,
+         186803,
+         3085636,
+         186801,
+         1239,
          1783272,
          2,
          131567,
@@ -104,7 +115,8 @@ microbe-disease record example: <br>
 }
 ```
 
-metabolite-gene record example: <br>
+## Metabolite-Gene
+Record example: <br>
 ```ruby
 {
    "_id":"6912_associated_with_7498",
