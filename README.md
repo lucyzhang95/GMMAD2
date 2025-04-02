@@ -115,6 +115,55 @@ Record example: <br>
 }
 ```
 
+Record shows healthy_sample_size is 0, which is excluded: <br>
+```ruby
+{
+   "_id":"1872678_OrganismalEntityAsAModelOfDiseaseAssociation_D000855",
+   "association":{
+      "predicate":"OrganismalEntityAsAModelOfDiseaseAssociation",
+      "control_name":"healthy control",
+      "qualifier":"increase",
+      "qualifier_ratio":"0.003266555",
+      "disease_sample_size":"4",
+      "disease_abundance_mean":"0.00459856",
+      "disease_abundance_median":"0.003266555",
+      "disease_abundance_sd":"0.002894081",
+      "healthy_sample_size":"0",
+      "healthy_abundance_mean":"0",
+      "healthy_abundance_median":"0",
+      "healthy_abundance_sd":"0"
+   },
+   "object":{
+      "id":"MESH:D000855",
+      "name":"anorexia",
+      "mesh":"D000855",
+      "type":"biolink:Disease",
+      "description":"The lack or loss of APPETITE accompanied by an aversion to food and the inability to eat. It is the defining characteristic of the disorder ANOREXIA NERVOSA."
+   },
+   "subject":{
+      "id":"taxid:1872678",
+      "taxid":1872678,
+      "name":"pseudoalteromonas fuliginea",
+      "type":"biolink:Bacterium",
+      "scientific_name":"pseudoalteromonas fuliginea",
+      "parent_taxid":53246,
+      "lineage":[
+         1872678,
+         53246,
+         267888,
+         135622,
+         1236,
+         1224,
+         3379134,
+         2,
+         131567,
+         1
+      ],
+      "rank":"species"
+   }
+}
+```
+
 ## Metabolite-Gene
 Record example: <br>
 ```ruby
