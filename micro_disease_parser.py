@@ -130,6 +130,7 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
             "healthy_abundance_mean": line[12],
             "healthy_abundance_median": line[13],
             "healthy_abundance_sd": line[14],
+            "infores": "gmmad2" # add knowledge source
         }
 
         output_dict = {
@@ -165,22 +166,35 @@ def load_micro_disease_data() -> Iterator[dict]:
 
 # if __name__ == "__main__":
 #     data = load_micro_disease_data()
-# _ids = []
-# for obj in data:
-#     print(obj)
-#     _ids.append(obj["_id"])
-# print(f"total records: {len(_ids)}")
-# print(f"total records without duplicates: {len(set(_ids))}")
+#     _ids = [obj["_id"] for obj in data]
+#     disease_ids = []
+#     disease_names = []
+#
+#     for obj in data:
+#         print(obj)
+#         if "id" in obj["object"]:
+#             disease_ids.append(obj["object"]["id"])
+#         else:
+#             disease_names.append(obj["object"]["name"])
+#
+#     unique_ids = set(_ids)
+#     unique_disease_ids = set(disease_ids)
+#     unique_disease_names = set(disease_names)
+#
+#     print(f"total records: {len(_ids)}")
+#     print(f"total records without duplicates: {len(unique_ids)}")
+#     print(f"Number of unique disease IDs: {len(unique_disease_ids)}")
+#     print(f"Number of disease names: {len(unique_disease_names)}")
 
-# from collections import Counter
-#
-# type_list = [obj["subject"]["type"] for obj in data]
-# type_counts = Counter(type_list) # count microorganism type
-#
-# for value, count in type_counts.items():
-#     print(f"{value}: {count}")
-#
-# rank_list = [obj["subject"]["rank"] for obj in data if "rank" in obj["subject"]]
-# rank_counts = Counter(rank_list)
-# for value, count in rank_counts.items():
-#     print(f"{value}: {count}")
+    # from collections import Counter
+    #
+    # type_list = [obj["subject"]["type"] for obj in data]
+    # type_counts = Counter(type_list) # count microorganism type
+    #
+    # for value, count in type_counts.items():
+    #     print(f"{value}: {count}")
+    #
+    # rank_list = [obj["subject"]["rank"] for obj in data if "rank" in obj["subject"]]
+    # rank_counts = Counter(rank_list)
+    # for value, count in rank_counts.items():
+    #     print(f"{value}: {count}")
