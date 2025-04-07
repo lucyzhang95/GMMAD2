@@ -66,6 +66,8 @@ Bacterium: 119590 <br>
 OrganismTaxon: 830 <br>
 Archaea: 865 <br>
 
+Unique disease MeSH ids: 83 <br>
+
 Record example: <br>
 ```ruby
 {
