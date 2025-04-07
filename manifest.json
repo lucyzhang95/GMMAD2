@@ -2,7 +2,9 @@
   "version": "0.3",
   "__metadata__": {
     "url": "http://guolab.whu.edu.cn/GMMAD2/home/",
-    "description": "Gut Microbial Metabolite Association with Disease"
+    "description": "Gut Microbial Metabolite Association with Disease",
+    "license": "Creative Commons Attribution 4.0 International License (CC BY 4.0)"
+
   },
   "display_name": "GMMAD",
   "biothing_type": "association",
