@@ -1,5 +1,12 @@
 .venv
-.idea
 data
 .xml
 .iml
+
+.idea
+.DS_Store
+.biothings_hub/
+.flake8
+GMMAD2_data_batch_1.pick
+__pycache__/
+pyproject.toml
