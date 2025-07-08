@@ -187,42 +187,6 @@ def get_ncit_taxon_description(taxon_names):
     return asyncio.run(get_ncit_taxon_description_async(taxon_names))
 
 
-# def get_ncit_taxon_description(taxon_names):
-#     """
-#
-#     :param taxon_names:
-#     :return:
-#     {'serratia': {'description':
-#     'A genus of small motile peritrichous bacteria in the Enterobacteriacaea family
-#     consisting of Gram-negative rods.
-#     [NCIT]',
-#     'xrefs': {'ncit': 'C86010', }} ...}
-#     """
-#     taxon_names = set(taxon_names)
-#     mapping_result = {}
-#     for name in taxon_names:
-#         params = {
-#             "q": name,
-#             "ontologies": "NCIT",
-#             "apikey": NCIT_API_KEY,
-#         }
-#         response = requests.get(search_url, params=params)
-#         data = response.json()
-#         for result in data.get("collection", []):
-#             if result:
-#                 ncit_output = {
-#                     "name": result.get("prefLabel").lower(),
-#                     "description": f"{result.get('definition')[0]} [NCIT]"
-#                     if "definition" in result
-#                     else "",
-#                     "xrefs": {"ncit": result.get("@id").split("#")[1]},
-#                 }
-#                 if ncit_output["name"] == name:
-#                     mapping_result[name] = ncit_output
-#                     del mapping_result[name]["name"]
-#     return mapping_result
-
-
 def add_description2taxon_info(taxon_info: dict, descriptions: dict) -> dict:
     for info in taxon_info.values():
         name = info.get("scientific_name").lower()
