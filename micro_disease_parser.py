@@ -94,16 +94,16 @@ def line_generator_4_midi(in_file: str | os.PathLike) -> Iterator[list[str]]:
                 yield new_line
 
 
-def get_taxon_info(f_path) -> list:
+def get_taxon_info(taxids: list) -> list:
     """retrieves taxonomic information for a given list of taxon IDs from disease_species.csv
 
     This function reads taxon IDs, removes duplicates, and queries taxonomic info from biothings_client
     to retrieve detailed taxonomic information including scientific name, parent taxid, lineage, and rank.
 
+    :param taxids: 
     :param f_path: Path to disease_species.csv containing the taxids.
     :return: A list of dictionaries containing taxonomic information.
     """
-    taxids = [line[5] for line in line_generator_4_midi(f_path)]
     taxids = set(taxids)
     t = biothings_client.get_client("taxon")
     taxon_info = t.gettaxa(taxids, fields=["scientific_name", "parent_taxid", "lineage", "rank"])
@@ -234,6 +234,30 @@ def get_organism_type(node) -> str:
     return "Other"
 
 
+def cache_data(f_path, gzip_path="taxdump.tar.gz"):
+    # cache all taxon info including lineage, rank, parent_taxid from disease_species.csv
+    taxids = sorted(set([line[5] for line in line_generator_4_midi(f_path)]))
+    print(f"Total unique taxids: {len(taxids)}")
+    taxon_info_q = get_taxon_info(taxids)
+    taxon_info = {t["query"]: t for t in taxon_info_q if "notfound" not in t.keys()}
+    print(f"Biothings mapped {len(taxon_info)} taxids.")
+    notfound = sorted(set([t["query"] for t in taxon_info_q if "notfound" in t.keys()]))
+    print(f"Not found taxids: {len(notfound)}")
+    taxid_mapping = load_merged_from_tar(gzip_path)
+    new_taxid_map = get_current_taxid(notfound, taxid_mapping)
+    print(f"NCBI mapped taxids: {len(new_taxid_map)}")
+    new_taxids = sorted(set([new for old, new in new_taxid_map.items()]))
+    print(f"taxids need to be queried: {len(new_taxids)}")
+    new_taxon_q = {t["query"]: t for t in get_taxon_info(new_taxids) if "notfound" not in t}
+    new_taxon_info = {
+        old: new_taxon_q[new] for old, new in new_taxid_map.items() if new in new_taxon_q
+    }
+    print(f"Biothings mapped new taxids: {len(new_taxon_info)}")
+    taxon_info.update(new_taxon_info)
+    print(f"Merged taxon info: {len(taxon_info)}")
+    save_pickle(taxon_info, "gmmad2_microbe_disease_taxon_info.pkl")
+
+
 def get_node_info(f_path: str | os.PathLike) -> Iterator[dict]:
     """generates node dictionaries and parse through the disease_species.csv file
     This function reads data, processes taxonomic information,
@@ -323,36 +347,38 @@ def load_micro_disease_data(f_path) -> Iterator[dict]:
 
 if __name__ == "__main__":
     file_path = os.path.join("downloads", "disease_species.csv")
-    data = load_micro_disease_data(file_path)
-    _ids = [obj["_id"] for obj in data]
-    disease_ids = []
-    disease_names = []
+    cache_data(file_path)
 
-    for obj in data:
-        print(obj)
-        if "id" in obj["object"]:
-            disease_ids.append(obj["object"]["id"])
-        else:
-            disease_names.append(obj["object"]["name"])
-
-    unique_ids = set(_ids)
-    unique_disease_ids = set(disease_ids)
-    unique_disease_names = set(disease_names)
-
-    print(f"total records: {len(_ids)}")
-    print(f"total records without duplicates: {len(unique_ids)}")
-    print(f"Number of unique disease IDs: {len(unique_disease_ids)}")
-    print(f"Number of disease names: {len(unique_disease_names)}")
-
-    from collections import Counter
-
-    type_list = [obj["subject"]["type"] for obj in data]
-    type_counts = Counter(type_list)  # count microorganism type
-
-    for value, count in type_counts.items():
-        print(f"{value}: {count}")
-
-    rank_list = [obj["subject"]["rank"] for obj in data if "rank" in obj["subject"]]
-    rank_counts = Counter(rank_list)
-    for value, count in rank_counts.items():
-        print(f"{value}: {count}")
+    # data = load_micro_disease_data(file_path)
+    # _ids = [obj["_id"] for obj in data]
+    # disease_ids = []
+    # disease_names = []
+    #
+    # for obj in data:
+    #     print(obj)
+    #     if "id" in obj["object"]:
+    #         disease_ids.append(obj["object"]["id"])
+    #     else:
+    #         disease_names.append(obj["object"]["name"])
+    #
+    # unique_ids = set(_ids)
+    # unique_disease_ids = set(disease_ids)
+    # unique_disease_names = set(disease_names)
+    #
+    # print(f"total records: {len(_ids)}")
+    # print(f"total records without duplicates: {len(unique_ids)}")
+    # print(f"Number of unique disease IDs: {len(unique_disease_ids)}")
+    # print(f"Number of disease names: {len(unique_disease_names)}")
+    #
+    # from collections import Counter
+    #
+    # type_list = [obj["subject"]["type"] for obj in data]
+    # type_counts = Counter(type_list)  # count microorganism type
+    #
+    # for value, count in type_counts.items():
+    #     print(f"{value}: {count}")
+    #
+    # rank_list = [obj["subject"]["rank"] for obj in data if "rank" in obj["subject"]]
+    # rank_counts = Counter(rank_list)
+    # for value, count in rank_counts.items():
+    #     print(f"{value}: {count}")
