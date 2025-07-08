@@ -101,7 +101,6 @@ def get_taxon_info(taxids: list) -> list:
     to retrieve detailed taxonomic information including scientific name, parent taxid, lineage, and rank.
 
     :param taxids: 
-    :param f_path: Path to disease_species.csv containing the taxids.
     :return: A list of dictionaries containing taxonomic information.
     """
     taxids = set(taxids)
