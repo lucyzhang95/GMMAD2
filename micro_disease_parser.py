@@ -147,7 +147,7 @@ def get_taxon_names(taxon_info: dict) -> list[str]:
     return list(taxon_names)
 
 
-async def _fetch_description(session: aiohttp.ClientSession, name: str, sem: asyncio.Semaphore):
+async def fetch_ncit_description(session: aiohttp.ClientSession, name: str, sem: asyncio.Semaphore):
     NCIT_API_KEY = os.getenv("NCIT_API_KEY")
     SEARCH_URL = "https://data.bioontology.org/search"
     params = {
@@ -178,7 +178,7 @@ async def get_ncit_taxon_description_async(taxon_names, max_concurrent=5):
     sem = asyncio.Semaphore(max_concurrent)
     connector = aiohttp.TCPConnector(limit_per_host=max_concurrent)
     async with aiohttp.ClientSession(connector=connector) as session:
-        tasks = [_fetch_description(session, name, sem) for name in unique_names]
+        tasks = [fetch_ncit_description(session, name, sem) for name in unique_names]
         responses = await asyncio.gather(*tasks)
     return {name: result for name, result in responses if result is not None}
 
