@@ -1,11 +1,13 @@
+import asyncio
 import json
 import os
 import pickle
 import tarfile
 from collections.abc import Iterator
 
+import aiohttp
 import biothings_client
-import requests
+from dotenv import load_dotenv
 from ete3 import NCBITaxa
 
 """updated on 07/07/2025
@@ -36,6 +38,7 @@ column names with index:
  23: 'genus'}
 """
 
+load_dotenv()
 CACHE_DIR = os.path.join(os.getcwd(), "cache")
 os.makedirs(CACHE_DIR, exist_ok=True)
 
@@ -100,7 +103,7 @@ def get_taxon_info(taxids: list) -> list:
     This function reads taxon IDs, removes duplicates, and queries taxonomic info from biothings_client
     to retrieve detailed taxonomic information including scientific name, parent taxid, lineage, and rank.
 
-    :param taxids: 
+    :param taxids:
     :return: A list of dictionaries containing taxonomic information.
     """
     taxids = set(taxids)
@@ -128,89 +131,104 @@ def load_merged_from_tar(tar_gz_path, f_name="merged.dmp"):
     return taxid_mapping
 
 
-def get_current_taxid(old_taxids, merged_mapping):
+def get_current_taxid(old_taxids: list, merged_mapping: dict) -> dict[str, str]:
     taxid_mapping = {}
     for old_taxid in old_taxids:
         taxid_mapping[old_taxid] = merged_mapping[old_taxid]
     return taxid_mapping
 
 
-def get_taxon_names(taxon_info: dict):
+def get_taxon_names(taxon_info: dict) -> list[str]:
     """Extracts biothings names from the taxon_info dictionary."""
     taxon_names = set()
+    for _, taxon in taxon_info.items():
+        if "scientific_name" in taxon:
+            taxon_names.add(taxon["scientific_name"].lower())
+    return list(taxon_names)
+
+
+async def _fetch_description(session: aiohttp.ClientSession, name: str, sem: asyncio.Semaphore):
+    NCIT_API_KEY = os.getenv("NCIT_API_KEY")
+    SEARCH_URL = "https://data.bioontology.org/search"
+    params = {
+        "q": name,
+        "ontologies": "NCIT",
+        "apikey": NCIT_API_KEY,
+    }
+    async with sem:
+        async with session.get(SEARCH_URL, params=params) as resp:
+            resp.raise_for_status()
+            data = await resp.json()
+    for result in data.get("collection", []):
+        if not result:
+            continue
+        pref_label = result.get("prefLabel", "").lower()
+        if pref_label != name:
+            continue
+        definition = result.get("definition", [])
+        ncit_id = result.get("@id", "").split("#")[-1]
+        return name, {
+            "description": definition[0] + "[NCIT]" if definition else "",
+            "xrefs": {"ncit": ncit_id},
+        }
+
+
+async def get_ncit_taxon_description_async(taxon_names, max_concurrent=5):
+    unique_names = {n.lower() for n in taxon_names}
+    sem = asyncio.Semaphore(max_concurrent)
+    connector = aiohttp.TCPConnector(limit_per_host=max_concurrent)
+    async with aiohttp.ClientSession(connector=connector) as session:
+        tasks = [_fetch_description(session, name, sem) for name in unique_names]
+        responses = await asyncio.gather(*tasks)
+    return {name: result for name, result in responses if result is not None}
 
 
 def get_ncit_taxon_description(taxon_names):
-    """
+    return asyncio.run(get_ncit_taxon_description_async(taxon_names))
 
-    :param taxon_names:
-    :return:
-    {'serratia': {'description':
-    'A genus of small motile peritrichous bacteria in the Enterobacteriacaea family
-    consisting of Gram-negative rods.
-    [NCIT]',
-    'xrefs': {'ncit': 'C86010', }} ...}
-    """
-    NCIT_API_KEY = os.getenv("NCIT_API_KEY")
-    search_url = "https://data.bioontology.org/search"
-    taxon_names = set(taxon_names)
-    mapping_result = {}
-    for name in taxon_names:
-        params = {
-            "q": name,
-            "ontologies": "NCIT",
-            "apikey": NCIT_API_KEY,
-        }
-        response = requests.get(search_url, params=params)
-        data = response.json()
-        for result in data.get("collection", []):
-            if result:
-                ncit_output = {
-                    "name": result.get("prefLabel").lower(),
-                    "description": f"{result.get('definition')[0]} [NCIT]"
-                    if "definition" in result
-                    else "",
-                    "xrefs": {"ncit": result.get("@id").split("#")[1]},
-                }
-                if ncit_output["name"] == name:
-                    mapping_result[name] = ncit_output
-                    del mapping_result[name]["name"]
-    return mapping_result
+
+# def get_ncit_taxon_description(taxon_names):
+#     """
+#
+#     :param taxon_names:
+#     :return:
+#     {'serratia': {'description':
+#     'A genus of small motile peritrichous bacteria in the Enterobacteriacaea family
+#     consisting of Gram-negative rods.
+#     [NCIT]',
+#     'xrefs': {'ncit': 'C86010', }} ...}
+#     """
+#     taxon_names = set(taxon_names)
+#     mapping_result = {}
+#     for name in taxon_names:
+#         params = {
+#             "q": name,
+#             "ontologies": "NCIT",
+#             "apikey": NCIT_API_KEY,
+#         }
+#         response = requests.get(search_url, params=params)
+#         data = response.json()
+#         for result in data.get("collection", []):
+#             if result:
+#                 ncit_output = {
+#                     "name": result.get("prefLabel").lower(),
+#                     "description": f"{result.get('definition')[0]} [NCIT]"
+#                     if "definition" in result
+#                     else "",
+#                     "xrefs": {"ncit": result.get("@id").split("#")[1]},
+#                 }
+#                 if ncit_output["name"] == name:
+#                     mapping_result[name] = ncit_output
+#                     del mapping_result[name]["name"]
+#     return mapping_result
 
 
 def add_description2taxon_info(taxon_info: dict, descriptions: dict) -> dict:
-    for _, info in taxon_info.items():
-        name = info.get("name")
-        if name in descriptions:
-            info.update(descriptions[name])
-        else:
-            pass
-
+    for info in taxon_info.values():
+        name = info.get("scientific_name").lower()
+        descr_info = descriptions.get(name, {})
+        info.update(descr_info)
     return taxon_info
-
-
-def get_full_taxon_info(mapped_taxon_names: dict, taxon_info: dict) -> dict:
-    """A dictionary of taxon metadata keyed by taxon name,
-    using taxid lookup from `taxon_info`.
-
-    :param mapped_taxon_names: Mapping of taxon name to a dict with taxon taxid, lineage, rank...
-    {'clostridia propionicum': {'taxid': 28446, 'mapping_tool': 'manual'} ...}
-    :param taxon_info: Mapping of taxid (as str) to a dictionary with mapped taxon names and taxid.
-    '28450': {'id': 'taxid:28450', 'taxid': 28450, 'name': 'burkholderia pseudomallei', 'parent_taxid': 111527, 'lineage': [28450, 111527, 32008, 119060, 80840, 28216, 1224, 3379134, 2, 131567, 1], 'rank': 'species', 'description': 'A species of aerobic, Gram-negative, rod shaped bacteria assigned to the phylum Proteobacteria.
-    This species is motile, non-spore forming, oxidase and catalase positive and indole negative.
-    B. pseudomallei is found in contaminated soil, water,
-    and produce and causes melioidosis in humans with the highest rate of disease occurring in southeast Asia.
-    [NCIT]', 'xrefs': {'ncit': 'C86010' }} ...}
-
-    :return:
-
-    """
-    full_taxon = {
-        name: taxon_info[str(taxon_entry["taxid"])]
-        for name, taxon_entry in mapped_taxon_names.items()
-        if str(taxon_entry["taxid"]) in taxon_info
-    }
-    return full_taxon
 
 
 def get_organism_type(node) -> str:
@@ -255,6 +273,15 @@ def cache_data(f_path, gzip_path="taxdump.tar.gz"):
     taxon_info.update(new_taxon_info)
     print(f"Merged taxon info: {len(taxon_info)}")
     save_pickle(taxon_info, "gmmad2_microbe_disease_taxon_info.pkl")
+
+    # cache taxon descriptions from NCIT
+    taxon_names = get_taxon_names(taxon_info)
+    print(f"Total unique taxon names: {len(taxon_names)}")
+    ncit_descriptions = get_ncit_taxon_description(taxon_names)
+    print(f"NCIT descriptions found for {len(ncit_descriptions)} taxon names.")
+    taxon_info_w_descr = add_description2taxon_info(taxon_info, ncit_descriptions)
+    save_pickle(taxon_info_w_descr, "gmmad2_microbe_disease_taxon_info_w_descr.pkl")
+    print(taxon_info_w_descr)
 
 
 def get_node_info(f_path: str | os.PathLike) -> Iterator[dict]:
