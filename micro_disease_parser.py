@@ -64,6 +64,26 @@ def get_taxon_info(file_path) -> list:
     return taxon_info
 
 
+def get_organism_type(node) -> str:
+    """
+    Inspect node['lineage'] for known taxids.
+    Return the matching biolink CURIE, or Other if no match.
+    Types include: 3 domains of life (Bacteria, Archaea, Eukaryota) and Virus.
+    """
+    taxon_map = {
+        2: "biolink:Bacterium",
+        2157: "Archaeon",
+        2759: "Eukaryote",
+        10239: "biolink:Virus",
+    }
+
+    for taxid, biolink_type in taxon_map.items():
+        if taxid in node.get("lineage", []):
+            return biolink_type
+
+    return "Other"
+
+
 def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
     """generates node dictionaries and parse through the disease_species.csv file
     This function reads data, processes taxonomic information,
@@ -93,29 +113,18 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
         subject_node = {
             "id": f"taxid:{taxid}",
             "taxid": taxid,
-            "name": line[2].lower(),
+            "name": None,
+            "original_name": line[2].lower(),
             "type": "biolink:OrganismTaxon",
         }
         if subject_node["taxid"] in taxon_info:
-            subject_node["scientific_name"] = taxon_info[subject_node["taxid"]]["scientific_name"]
+            subject_node["name"] = taxon_info[subject_node["taxid"]]["scientific_name"]
             subject_node["parent_taxid"] = taxon_info[subject_node["taxid"]]["parent_taxid"]
             subject_node["lineage"] = taxon_info[subject_node["taxid"]]["lineage"]
             subject_node["rank"] = taxon_info[subject_node["taxid"]]["rank"]
+            subject_node["organism_type"] = get_organism_type(subject_node)
 
-        # assign subject microbial super kingdom type
-        if "lineage" in subject_node:
-            if 2 in subject_node["lineage"]:
-                subject_node["type"] = "biolink:Bacterium"
-            elif 10239 in subject_node["lineage"]:
-                subject_node["type"] = "biolink:Virus"
-            elif 4751 in subject_node["lineage"]:
-                subject_node["type"] = "biolink:Fungus"
-            elif 2157 in subject_node["lineage"]:
-                subject_node["type"] = "biolink:Archaea"
-            else:
-                subject_node["type"] = "biolink:OrganismTaxon"
-
-        # create association node
+        # association node
         # includes disease and health sample sizes, microbial abundance mean, median, sd, qualifier
         association_node = {
             "predicate": "OrganismalEntityAsAModelOfDiseaseAssociation",
@@ -130,7 +139,7 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
             "healthy_abundance_mean": line[12],
             "healthy_abundance_median": line[13],
             "healthy_abundance_sd": line[14],
-            "infores": "gmmad2" # add knowledge source
+            "infores": "GMMAD2-GMrepo",  # knowledge source
         }
 
         output_dict = {
@@ -143,16 +152,14 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
         yield output_dict
 
 
-def load_micro_disease_data() -> Iterator[dict]:
+def load_micro_disease_data(f_path) -> Iterator[dict]:
     """loads and yields microbe-disease data records from disease_species.csv file
     This function constructs the file path to the disease_species.csv file,
     retrieves node information using the `get_node_info` function, and yields each record.
 
     :return: An iterator of dictionaries containing microbe-disease data.
     """
-    path = os.getcwd()
-    file_path = os.path.join(path, "data", "disease_species.csv")
-    assert os.path.exists(file_path), f"The file {file_path} does not exist."
+    assert os.path.exists(f_path), f"The file {file_path} does not exist."
 
     recs = get_node_info(file_path)
     for rec in recs:
@@ -164,37 +171,38 @@ def load_micro_disease_data() -> Iterator[dict]:
             yield rec
 
 
-# if __name__ == "__main__":
-#     data = load_micro_disease_data()
-#     _ids = [obj["_id"] for obj in data]
-#     disease_ids = []
-#     disease_names = []
-#
-#     for obj in data:
-#         print(obj)
-#         if "id" in obj["object"]:
-#             disease_ids.append(obj["object"]["id"])
-#         else:
-#             disease_names.append(obj["object"]["name"])
-#
-#     unique_ids = set(_ids)
-#     unique_disease_ids = set(disease_ids)
-#     unique_disease_names = set(disease_names)
-#
-#     print(f"total records: {len(_ids)}")
-#     print(f"total records without duplicates: {len(unique_ids)}")
-#     print(f"Number of unique disease IDs: {len(unique_disease_ids)}")
-#     print(f"Number of disease names: {len(unique_disease_names)}")
+if __name__ == "__main__":
+    file_path = os.path.join("downloads", "disease_species.csv")
+    data = load_micro_disease_data(file_path)
+    _ids = [obj["_id"] for obj in data]
+    disease_ids = []
+    disease_names = []
 
-    # from collections import Counter
-    #
-    # type_list = [obj["subject"]["type"] for obj in data]
-    # type_counts = Counter(type_list) # count microorganism type
-    #
-    # for value, count in type_counts.items():
-    #     print(f"{value}: {count}")
-    #
-    # rank_list = [obj["subject"]["rank"] for obj in data if "rank" in obj["subject"]]
-    # rank_counts = Counter(rank_list)
-    # for value, count in rank_counts.items():
-    #     print(f"{value}: {count}")
+    for obj in data:
+        print(obj)
+        if "id" in obj["object"]:
+            disease_ids.append(obj["object"]["id"])
+        else:
+            disease_names.append(obj["object"]["name"])
+
+    unique_ids = set(_ids)
+    unique_disease_ids = set(disease_ids)
+    unique_disease_names = set(disease_names)
+
+    print(f"total records: {len(_ids)}")
+    print(f"total records without duplicates: {len(unique_ids)}")
+    print(f"Number of unique disease IDs: {len(unique_disease_ids)}")
+    print(f"Number of disease names: {len(unique_disease_names)}")
+
+    from collections import Counter
+
+    type_list = [obj["subject"]["type"] for obj in data]
+    type_counts = Counter(type_list)  # count microorganism type
+
+    for value, count in type_counts.items():
+        print(f"{value}: {count}")
+
+    rank_list = [obj["subject"]["rank"] for obj in data if "rank" in obj["subject"]]
+    rank_counts = Counter(rank_list)
+    for value, count in rank_counts.items():
+        print(f"{value}: {count}")
