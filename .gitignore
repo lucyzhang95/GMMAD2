@@ -11,3 +11,4 @@ pyproject.toml
 .iml
 .DS_Store
 .flake8
+.env
