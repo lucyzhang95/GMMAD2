@@ -568,7 +568,7 @@ def load_meta_gene_data() -> Iterator[dict]:
             yield rec
 
 
-def load_data(data_path) -> Iterator[dict]:
+def load_gmmad2_data(data_path) -> Iterator[dict]:
     """
     Loads and combines all 3 relationships among microbes, diseases, and metabolites in GMMAD2 database
     sorts them by their '_id' field, and yields each document in sorted order.
@@ -600,17 +600,17 @@ def load_data(data_path) -> Iterator[dict]:
         yield doc
 
 
-# if __name__ == "__main__":
-#     import json
-#     # data_list = []
-#     # data = load_data()
-#
-#     data_to_save = [obj for obj in load_data()]
-#     with open("data/gmmad2_data.json", "w", encoding="utf-8") as f:
-#         json.dump(data_to_save, f, ensure_ascii=False, indent=4)
+if __name__ == "__main__":
+    import json
+    # data_list = []
+    # data = load_data()
 
-# for obj in data:
-#     data_list.append(obj["_id"])
+    data_to_save = [obj for obj in load_gmmad2_data()]
+    with open("data/gmmad2_data.json", "w", encoding="utf-8") as f:
+        json.dump(data_to_save, f, ensure_ascii=False, indent=4)
 
-# print("total records", len(data_list))
-# print("total records without duplications", len(set(data_list)))
+for obj in data:
+    data_list.append(obj["_id"])
+
+print("total records", len(data_list))
+print("total records without duplications", len(set(data_list)))
