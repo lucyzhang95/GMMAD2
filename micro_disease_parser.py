@@ -5,32 +5,30 @@ from collections.abc import Iterator
 import biothings_client
 
 """
-column names with index: 
-{
-    0: 'disease_id', 
-    1: 'disease', 
-    2: 'organism', 
-    3: 'level', 
-    4: 'species_id', 
-    5: 'disease_samples', 
-    6: 'disease_mean', 
-    7: 'disease_median', 
-    8: 'disease_sd', 
-    9: 'health_id', 
-    10: 'health', 
-    11: 'health_samples', 
-    12: 'health_mean', 
-    13: 'health_median', 
-    14: 'health_sd', 
-    15: 'change', 
-    16: 'alteration', 
-    17: 'disease_info', 
-    18: 'phylum', 
-    19: 'class', 
-    20: 'order', 
-    21: 'family', 
-    22: 'genus'
-}
+column names with index:
+0: 'disease_id',
+1: 'disease',
+2: 'organism',
+3: 'level',
+4: 'species_id',
+5: 'disease_samples',
+6: 'disease_mean',
+7: 'disease_median',
+8: 'disease_sd',
+9: 'health_id',
+10: 'health',
+11: 'health_samples',
+12: 'health_mean',
+13: 'health_median',
+14: 'health_sd',
+15: 'change',
+16: 'alteration',
+17: 'disease_info',
+18: 'phylum',
+19: 'class',
+20: 'order',
+21: 'family',
+22: 'genus'
 """
 
 
