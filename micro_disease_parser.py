@@ -334,7 +334,7 @@ def get_node_info(f_path: str | os.PathLike) -> Iterator[dict]:
         if taxid in taxon_info:
             subject_node = {
                 "id": f"NCBITaxon:{taxon_info[taxid].get('_id')}",
-                "taxid": taxon_info[taxid].get("_id"),
+                "taxid": int(taxon_info[taxid].get("_id")),
                 "name": taxon_info[taxid].get("scientific_name").lower(),
                 "original_name": line[3].lower(),
                 "description": taxon_info[taxid].get("description"),
@@ -353,17 +353,17 @@ def get_node_info(f_path: str | os.PathLike) -> Iterator[dict]:
         association_node = {
             "predicate": "OrganismalEntityAsAModelOfDiseaseAssociation",
             "type": "biolink:associated_with",
-            "control_name": "healthy control",
             "qualifier": line[17].lower(),
-            "qualifier_ratio": line[16],
-            "disease_sample_size": line[6],
-            "disease_abundance_mean": line[7],
-            "disease_abundance_median": line[8],
-            "disease_abundance_sd": line[9],
-            "healthy_sample_size": line[12],
-            "healthy_abundance_mean": line[13],
-            "healthy_abundance_median": line[14],
-            "healthy_abundance_sd": line[15],
+            "qualifier_ratio": float(line[16]),
+            "disease_sample_size": int(line[6]),
+            "disease_abundance_mean": float(line[7]),
+            "disease_abundance_median": float(line[8]),
+            "disease_abundance_sd": float(line[9]),
+            "control_name": "healthy control",
+            "healthy_sample_size": int(line[12]),
+            "healthy_abundance_mean": float(line[13]),
+            "healthy_abundance_median": float(line[14]),
+            "healthy_abundance_sd": float(line[15]),
             "infores": "GMMAD2-GMrepo",  # original knowledge source
         }
         association_node = remove_empty_none_values(association_node)
