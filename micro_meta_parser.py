@@ -169,6 +169,7 @@ async def get_batch_pubchem_descriptions_async(
     sem = asyncio.Semaphore(workers)
     results: Dict[int, Dict[str, str]] = {}
     connector = aiohttp.TCPConnector(limit_per_host=workers)
+    cids = list(set(cids))
 
     async with aiohttp.ClientSession(connector=connector) as session:
         for i in range(0, len(cids), workers):
