@@ -365,7 +365,9 @@ def get_node_info(f_path: str | os.PathLike) -> Iterator[dict]:
             "healthy_abundance_mean": float(line[13]),
             "healthy_abundance_median": float(line[14]),
             "healthy_abundance_sd": float(line[15]),
-            "infores": "GMMAD2-GMrepo",  # original knowledge source
+            "primary_knowledge_source": "infores:GMrepo",
+            "aggregator_knowledge_source": "infores:GMMAD2",
+            "evidence_type": "ECO:0000221"  # high throughput nucleotide sequencing assay evidence
         }
         association_node = remove_empty_none_values(association_node)
 
