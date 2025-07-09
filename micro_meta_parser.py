@@ -16,6 +16,7 @@ import aiohttp
 import biothings_client
 from dotenv import load_dotenv
 from ete3 import NCBITaxa
+from tqdm.asyncio import tqdm_asyncio
 
 """
 column names with index:
@@ -175,26 +176,34 @@ async def get_batch_pubchem_descriptions_async(
     cids: List[int],
     workers: int = 5,
 ) -> Dict[int, Dict[str, str]]:
-    sem = asyncio.Semaphore(workers)
-    results: Dict[int, Dict[str, str]] = {}
-    connector = aiohttp.TCPConnector(limit_per_host=workers)
     cids = list(set(cids))
 
+    workers = min(workers, 5)
+    sem = asyncio.Semaphore(workers)
+    connector = aiohttp.TCPConnector(limit_per_host=workers)
+
+    results = {}
     async with aiohttp.ClientSession(connector=connector) as session:
-        for i in range(0, len(cids), workers):
-            t0 = time.perf_counter()
-            chunk = cids[i : i + workers]
-            tasks = [pug_query_pubchem_description(cid, session, sem) for cid in chunk]
-            for cid, payload in await asyncio.gather(*tasks):
-                if payload:
-                    results[cid] = payload
-            elapsed = time.perf_counter() - t0
-            if elapsed < 1.0:
-                await asyncio.sleep(1.0 - elapsed)
+        tasks = []
+        last_launch = 0.0
+
+        for cid in cids:
+            elapsed = time.perf_counter() - last_launch
+            if elapsed < 1.0 / 5:
+                await asyncio.sleep(1.0 / 5 - elapsed)
+            last_launch = time.perf_counter()
+
+            task = asyncio.create_task(pug_query_pubchem_description(cid, session, sem))
+            tasks.append(task)
+
+        for cid, payload in await tqdm_asyncio.gather(*tasks, total=len(tasks)):
+            if payload:
+                results[cid] = payload
+
     return results
 
 
-def get_pubchem_descriptions(cids: List[int], workers: int = 3):
+def get_pubchem_descriptions(cids: List[int], workers: int = 5):
     return asyncio.run(get_batch_pubchem_descriptions_async(cids, workers))
 
 
