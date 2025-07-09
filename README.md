@@ -81,6 +81,7 @@ Record example: <br>
       "disease_abundance_mean":0.005916993,
       "disease_abundance_median":0.00524027,
       "disease_abundance_sd":0.002282477,
+      "control_id":"D006262",
       "control_name":"healthy control",
       "healthy_sample_size":308,
       "healthy_abundance_mean":0.02932498,
