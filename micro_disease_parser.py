@@ -3,6 +3,7 @@ import json
 import os
 import pickle
 import tarfile
+from collections import Counter
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -397,38 +398,29 @@ def load_micro_disease_data(f_path) -> Iterator[dict]:
 
 if __name__ == "__main__":
     file_path = os.path.join("downloads", "disease_species.csv")
-    cache_data(file_path)
 
-    # data = load_micro_disease_data(file_path)
-    # _ids = [obj["_id"] for obj in data]
-    # disease_ids = []
-    # disease_names = []
-    #
-    # for obj in data:
-    #     print(obj)
-    #     if "id" in obj["object"]:
-    #         disease_ids.append(obj["object"]["id"])
-    #     else:
-    #         disease_names.append(obj["object"]["name"])
-    #
-    # unique_ids = set(_ids)
-    # unique_disease_ids = set(disease_ids)
-    # unique_disease_names = set(disease_names)
-    #
-    # print(f"total records: {len(_ids)}")
-    # print(f"total records without duplicates: {len(unique_ids)}")
-    # print(f"Number of unique disease IDs: {len(unique_disease_ids)}")
-    # print(f"Number of disease names: {len(unique_disease_names)}")
-    #
-    # from collections import Counter
-    #
-    # type_list = [obj["subject"]["type"] for obj in data]
-    # type_counts = Counter(type_list)  # count microorganism type
-    #
-    # for value, count in type_counts.items():
-    #     print(f"{value}: {count}")
-    #
-    # rank_list = [obj["subject"]["rank"] for obj in data if "rank" in obj["subject"]]
-    # rank_counts = Counter(rank_list)
-    # for value, count in rank_counts.items():
-    #     print(f"{value}: {count}")
+    data = load_micro_disease_data(file_path)
+    recs = [rec for rec in data]
+    save_pickle(recs, "gmmad2_microbe_disease.pkl")
+    save_json(recs, "gmmad2_microbe_disease.json")
+
+    _ids = [rec["_id"] for rec in recs]
+    disease_ids = []
+
+    for obj in recs:
+        if "id" in obj["object"]:
+            disease_ids.append(obj["object"]["id"])
+
+    unique_ids = set(_ids)
+    unique_disease_ids = set(disease_ids)
+
+    print(f"total records: {len(_ids)}")
+    print(f"total records without duplicates: {len(unique_ids)}")
+    print(f"Number of unique disease IDs: {len(unique_disease_ids)}")
+
+    type_list = [obj["subject"]["organism_type"] for obj in recs]
+    type_counts = Counter(type_list)  # count organism types
+    print(type_counts)
+    rank_list = [obj["subject"]["rank"] for obj in recs if "rank" in obj["subject"]]
+    rank_counts = Counter(rank_list)
+    print(rank_counts)
