@@ -160,24 +160,30 @@ async def pug_query_pubchem_description(
     description = None
     synonyms = []
 
-    sections = data.get("Record", {}).get("Section", [])
-    for sec in sections:
-        if sec.get("TOCHeading") == "Names and Identifiers":
+    for sec in data.get("Record", {}).get("Section", []):
+        heading = sec.get("TOCHeading", "")
+        if heading == "Names and Identifiers" and description is None:
             for sub in sec.get("Section", []):
-                for info in sub.get("Information", []):
-                    markup = info.get("Value", {}).get("StringWithMarkup", [])
-                    if markup:
-                        descr = markup[0].get("String")
-                        if descr:
-                            description = descr.strip()
-        elif sec.get("TOCHeading") == "Synonyms":
-            for sub in sec.get("Section", []):
-                for info in sub.get("Information", []):
-                    markup = info.get("Value", {}).get("StringWithMarkup", [])
-                    if markup:
-                        synonym = markup[0].get("String")
-                        if synonym:
-                            synonyms.append(synonym)
+                if sub.get("TOCHeading") == "Record Description":
+                    for info in sub.get("Information", []):
+                        for mark in info.get("Value", {}).get("StringWithMarkup", []):
+                            text = mark.get("String", "").strip()
+                            if text:
+                                description = text
+                                break
+                        if description:
+                            break
+                elif sub.get("TOCHeading") == "Synonyms":
+                    for sec in sub.get("Section", []):
+                        for info in sec.get("Information", []):
+                            for mark in info.get("Value", {}).get("StringWithMarkup", []):
+                                text = mark.get("String", "").strip()
+                                if text:
+                                    synonyms.append(text.lower().strip())
+            break
+
+    seen = set()
+    synonyms = [s for s in synonyms if not (s in seen or seen.add(s))]
 
     return cid, {
         "id": f"PUBCHEM.COMPOUND:{cid}",
@@ -304,7 +310,7 @@ def load_merged_from_tar(tar_gz_path, f_name="merged.dmp"):
 def get_current_taxid(old_taxids: list, merged_mapping: dict) -> dict[str, str]:
     taxid_mapping = {}
     for old_taxid in old_taxids:
-        taxid_mapping[old_taxid] = merged_mapping[old_taxid]
+        taxid_mapping[old_taxid] = merged_mapping.get(old_taxid, None)
     return taxid_mapping
 
 
