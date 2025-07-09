@@ -66,15 +66,16 @@ def save_json(obj, f_name):
         json.dump(obj, out_f, indent=4)
 
 
-def line_generator(in_file: str | os.PathLike) -> Iterator[list]:
+def line_generator(in_file: str | os.PathLike, delimiter=",") -> Iterator[list]:
     """generates lines from a CSV file, yielding each line as a list of strings
     This function opens the specified CSV file, skips the header row, and yields each subsequent line as a list of strings.
 
     :param in_file: The path to the CSV file.
+    :param delimiter: The character used to separate values in the CSV file (default is comma).
     :return: An iterator that yields each line of the CSV file as a list of strings.
     """
     with open(in_file, "r") as in_f:
-        reader = csv.reader(in_f)
+        reader = csv.reader(in_f, delimiter=delimiter)
         next(reader)
         for line in reader:
             yield line
@@ -128,6 +129,11 @@ def get_taxon_info(taxids: list) -> list:
     t = biothings_client.get_client("taxon")
     taxon_info = t.gettaxa(taxids, fields=["scientific_name", "parent_taxid", "lineage", "rank"])
     return taxon_info
+
+
+def get_bigg_metabolite_mapping(in_f):
+    bigg_map = {line[2].lower(): line[1] for line in line_generator(in_f, delimiter="\t")}
+    return bigg_map
 
 
 def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
