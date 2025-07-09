@@ -157,19 +157,38 @@ async def pug_query_pubchem_description(
                 else:
                     raise e
 
-    sections = data.get("Record", {}).get("Section", [])
+    description = None
+    synonyms = []
+
     for sec in sections:
-        if sec.get("TOCHeading") == "Names and Identifiers":
+        heading = sec.get("TOCHeading", "")
+        if heading == "Names and Identifiers":
+            for sub in sec.get("Section", []):
+                if sub.get("TOCHeading") == "Name and Identifiers":
+                    for info in sub.get("Information", []):
+                        for mark in info.get("Value", {}).get("StringWithMarkup", []):
+                            text = mark.get("String")
+                            if text:
+                                description = text
+                                break
+                        if description:
+                            break
+                if description:
+                    break
+
+        elif heading == "Synonyms":
             for sub in sec.get("Section", []):
                 for info in sub.get("Information", []):
-                    markup = info.get("Value", {}).get("StringWithMarkup", [])
-                    if markup:
-                        descr = markup[0].get("String")
-                        if descr:
-                            return cid, {
-                                "id": f"PUBCHEM.COMPOUND:{cid}",
-                                "description": f"{descr}[PUBCHEM]",
-                            }
+                    for mark in info.get("Value", {}).get("StringWithMarkup", []):
+                        text = mark.get("String")
+                        if text:
+                            synonyms.append(text)
+
+    return cid, {
+        "id": f"PUBCHEM.COMPOUND:{cid}",
+        "description": f"{description}[PUBCHEM]" if description else "",
+        "synonyms": synonyms,
+    }
 
 
 async def get_batch_pubchem_descriptions_async(
@@ -321,8 +340,6 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
             output_dict["_id"] = f"{subject_node['id']}_associated_with_{object_node['id']}"
 
         yield output_dict
-        
-
 
 
 def load_micro_meta_data(f_path) -> Iterator[dict]:
