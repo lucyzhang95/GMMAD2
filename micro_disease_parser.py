@@ -352,6 +352,7 @@ def get_node_info(f_path: str | os.PathLike) -> Iterator[dict]:
         # includes disease and health sample sizes, microbial abundance mean, median, sd, qualifier
         association_node = {
             "predicate": "OrganismalEntityAsAModelOfDiseaseAssociation",
+            "type": "biolink:associated_with",
             "control_name": "healthy control",
             "qualifier": line[17].lower(),
             "qualifier_ratio": line[16],
@@ -368,7 +369,7 @@ def get_node_info(f_path: str | os.PathLike) -> Iterator[dict]:
         association_node = remove_empty_none_values(association_node)
 
         output_dict = {
-            "_id": f"{subject_node['id'].split(':')[1]}_OrganismalEntityAsAModelOfDiseaseAssociation_{object_node['id'].split(':')[1]}",
+            "_id": f"{subject_node['id'].split(':')[1]}_associated_with_{object_node['id'].split(':')[1]}",
             "association": association_node,
             "object": object_node,
             "subject": subject_node,
