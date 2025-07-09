@@ -71,21 +71,21 @@ Unique disease MeSH ids: 83 <br>
 Record example: <br>
 ```ruby
 {
-   "_id":"550_associated_with_D003248",
+   "_id":"1550_associated_with_D003248",
    "association":{
       "predicate":"OrganismalEntityAsAModelOfDiseaseAssociation",
-      "type": "biolink:associated_with",
+      "type":"biolink:associated_with",
+      "qualifier":"increase",
+      "qualifier_ratio":0.003794545,
+      "disease_sample_size":3,
+      "disease_abundance_mean":0.005916993,
+      "disease_abundance_median":0.00524027,
+      "disease_abundance_sd":0.002282477,
       "control_name":"healthy control",
-      "qualifier":"decrease",
-      "qualifier_ratio":"-0.024910135",
-      "disease_sample_size":"14",
-      "disease_abundance_mean":"0.00368739",
-      "disease_abundance_median":"0.003374865",
-      "disease_abundance_sd":"0.001770184",
-      "healthy_sample_size":"956",
-      "healthy_abundance_mean":"1.000008241",
-      "healthy_abundance_median":"0.028285",
-      "healthy_abundance_sd":"6.90301989",
+      "healthy_sample_size":308,
+      "healthy_abundance_mean":0.02932498,
+      "healthy_abundance_median":0.001445725,
+      "healthy_abundance_sd":0.326459014,
       "infores":"GMMAD2-GMrepo"
    },
    "object":{
@@ -98,21 +98,20 @@ Record example: <br>
       }
    },
    "subject":{
-      "id":"NCBITaxon:550",
-      "taxid":"550",
-      "name":"enterobacter cloacae",
-      "original_name":"enterobacter cloacae",
-      "description":"A species of facultatively anaerobic, Gram negative, rod shaped bacterium in the phylum Proteobacteria. This species is motile by peritrichous flagella, oxidase, urease and indole negative, catalase positive, reduces nitrate, does not degrade pectate and produces acid from sorbitol. E. cloacae is associated with hospital-acquired urinary and respiratory tract infections and is used in industry for explosives biodegradation. [NCIT]",
-      "parent_taxid":354276,
+      "id":"NCBITaxon:1550",
+      "taxid":1550,
+      "name":"clostridium subterminale",
+      "original_name":"clostridium subterminale",
+      "description":"A species of anaerobic, Gram positive, rod shaped bacteria assigned to the phylum Proteobacteria. This species is spore forming, motile, produces the type G toxin, does not hydrolyze esculin and is beta-hemolytic. C. subterminale is isolated from soil and is pathogenic, being a causative agent of botulism. [NCIT]",
+      "parent_taxid":1485,
       "lineage":[
-         550,
-         354276,
-         547,
-         543,
-         91347,
-         1236,
-         1224,
-         3379134,
+         1550,
+         1485,
+         31979,
+         186802,
+         186801,
+         1239,
+         1783272,
          2,
          131567,
          1
@@ -121,7 +120,7 @@ Record example: <br>
       "type":"biolink:OrganismTaxon",
       "organism_type":"biolink:Bacterium",
       "xrefs":{
-         "ncit":"C86360"
+         "ncit":"C86295"
       }
    }
 }
