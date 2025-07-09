@@ -74,6 +74,7 @@ Record example: <br>
    "_id":"550_associated_with_D003248",
    "association":{
       "predicate":"OrganismalEntityAsAModelOfDiseaseAssociation",
+      "type": "biolink:associated_with",
       "control_name":"healthy control",
       "qualifier":"decrease",
       "qualifier_ratio":"-0.024910135",
