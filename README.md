@@ -71,7 +71,7 @@ Unique disease MeSH ids: 83 <br>
 Record example: <br>
 ```ruby
 {
-   "_id":"550_OrganismalEntityAsAModelOfDiseaseAssociation_D003248",
+   "_id":"550_associated_with_D003248",
    "association":{
       "predicate":"OrganismalEntityAsAModelOfDiseaseAssociation",
       "control_name":"healthy control",
