@@ -138,13 +138,23 @@ async def pug_query_pubchem_description(
     cid: int,
     session: aiohttp.ClientSession,
     sem: asyncio.Semaphore,
-) -> Tuple[int, Dict[str, str] | None]:
+    max_retries: int = 3,
+    delay: float = 1.0,
+):
     url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/{cid}/JSON"
-
-    async with sem:
-        async with session.get(url, timeout=30) as resp:
-            resp.raise_for_status()
-            data = await resp.json()
+    for attempt in range(max_retries):
+        async with sem:
+            try:
+                async with session.get(url, timeout=30) as resp:
+                    resp.raise_for_status()
+                    data = await resp.json()
+                break
+            except aiohttp.ClientError as e:
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(delay * (2**attempt))
+                    continue
+                else:
+                    raise e
 
     sections = data.get("Record", {}).get("Section", [])
     for sec in sections:
@@ -152,7 +162,7 @@ async def pug_query_pubchem_description(
             for sub in sec.get("Section", []):
                 for info in sub.get("Information", []):
                     markup = info.get("Value", {}).get("StringWithMarkup", [])
-                    if isinstance(markup, list) and markup:
+                    if markup:
                         descr = markup[0].get("String")
                         if descr:
                             return cid, {
