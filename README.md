@@ -71,48 +71,57 @@ Unique disease MeSH ids: 83 <br>
 Record example: <br>
 ```ruby
 {
-   "_id":"1755642_OrganismalEntityAsAModelOfDiseaseAssociation_D003093",
+   "_id":"550_OrganismalEntityAsAModelOfDiseaseAssociation_D003248",
    "association":{
       "predicate":"OrganismalEntityAsAModelOfDiseaseAssociation",
       "control_name":"healthy control",
       "qualifier":"decrease",
-      "qualifier_ratio":"-0.001222806",
-      "disease_sample_size":"3",
-      "disease_abundance_mean":"0.000544065",
-      "disease_abundance_median":"0.000506614",
-      "disease_abundance_sd":"0.000351942",
-      "healthy_sample_size":"233",
-      "healthy_abundance_mean":"0.002674384",
-      "healthy_abundance_median":"0.00172942",
-      "healthy_abundance_sd":"0.002712906"
+      "qualifier_ratio":"-0.024910135",
+      "disease_sample_size":"14",
+      "disease_abundance_mean":"0.00368739",
+      "disease_abundance_median":"0.003374865",
+      "disease_abundance_sd":"0.001770184",
+      "healthy_sample_size":"956",
+      "healthy_abundance_mean":"1.000008241",
+      "healthy_abundance_median":"0.028285",
+      "healthy_abundance_sd":"6.90301989",
+      "infores":"GMMAD2-GMrepo"
    },
    "object":{
-      "id":"MESH:D003093",
-      "name":"colitis, ulcerative",
-      "mesh":"D003093",
+      "id":"MESH:D003248",
+      "name":"constipation",
       "type":"biolink:Disease",
-      "description":"Inflammation of the COLON that is predominantly confined to the MUCOSA. Its major symptoms include DIARRHEA, rectal BLEEDING, the passage of MUCUS, and ABDOMINAL PAIN."
+      "description":"Infrequent or difficult evacuation of FECES. These symptoms are associated with a variety of causes,including low DIETARY FIBER intake,emotional or nervous disturbances,systemic and structural disorders,drug-induced aggravation,and infections.",
+      "xrefs":{
+         "mesh":"MESH:D003248"
+      }
    },
    "subject":{
-      "id":"taxid:1755642",
-      "taxid":1755642,
-      "name":"lachnospiraceae bacterium mc_35",
-      "type":"biolink:Bacterium",
-      "scientific_name":"lachnospiraceae bacterium mc_35",
-      "parent_taxid":186928,
+      "id":"NCBITaxon:550",
+      "taxid":"550",
+      "name":"enterobacter cloacae",
+      "original_name":"enterobacter cloacae",
+      "description":"A species of facultatively anaerobic, Gram negative, rod shaped bacterium in the phylum Proteobacteria. This species is motile by peritrichous flagella, oxidase, urease and indole negative, catalase positive, reduces nitrate, does not degrade pectate and produces acid from sorbitol. E. cloacae is associated with hospital-acquired urinary and respiratory tract infections and is used in industry for explosives biodegradation. [NCIT]",
+      "parent_taxid":354276,
       "lineage":[
-         1755642,
-         186928,
-         186803,
-         3085636,
-         186801,
-         1239,
-         1783272,
+         550,
+         354276,
+         547,
+         543,
+         91347,
+         1236,
+         1224,
+         3379134,
          2,
          131567,
          1
       ],
-      "rank":"species"
+      "rank":"species",
+      "type":"biolink:OrganismTaxon",
+      "organism_type":"biolink:Bacterium",
+      "xrefs":{
+         "ncit":"C86360"
+      }
    }
 }
 ```
