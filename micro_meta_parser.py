@@ -168,7 +168,7 @@ async def pug_query_pubchem_description(
                         if descr:
                             return cid, {
                                 "id": f"PUBCHEM.COMPOUND:{cid}",
-                                "description": descr,
+                                "description": f"{descr}[PUBCHEM]",
                             }
 
 
