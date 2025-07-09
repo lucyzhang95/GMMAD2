@@ -1,36 +1,69 @@
+import asyncio
 import csv
+import json
 import os
+import pickle
+import tarfile
 import uuid
+from collections import Counter
 from collections.abc import Iterator
+from pathlib import Path
 
+import aiohttp
 import biothings_client
+from dotenv import load_dotenv
+from ete3 import NCBITaxa
 
 """
-column names with index: 
-{
-    0: 'id', 
-    1: 'g_micro', 
-    2: 'organism', 
-    3: 'g_meta', 
-    4: 'metabolic', 
-    5: 'pubchem_compound', 
-    6: 'pubchem_id', 
-    7: 'formula', 
-    8: 'kegg_id', 
-    9: 'tax_id', 
-    10: 'phylum', 
-    11: 'class', 
-    12: 'order', 
-    13: 'family', 
-    14: 'genus', 
-    15: 'species', 
-    16: 'species_id', 
-    17: 'source', 
-    18: 'smiles_sequence', 
-    19: 'HMDBID', 
-    20: 'Origin'
-}
+column names with index:
+{0: 'id',
+ 1: 'g_micro',
+ 2: 'organism',
+ 3: 'g_meta',
+ 4: 'metabolic',
+ 5: 'pubchem_compound',
+ 6: 'pubchem_id',
+ 7: 'formula',
+ 8: 'kegg_id',
+ 9: 'tax_id',
+ 10: 'phylum',
+ 11: 'class',
+ 12: 'order',
+ 13: 'family',
+ 14: 'genus',
+ 15: 'species',
+ 16: 'species_id',
+ 17: 'source',
+ 18: 'smiles_sequence',
+ 19: 'HMDBID',
+ 20: 'Origin'}
 """
+
+load_dotenv()
+CACHE_DIR = os.path.join(os.getcwd(), "cache")
+os.makedirs(CACHE_DIR, exist_ok=True)
+
+
+def save_pickle(obj, f_name):
+    """
+    :param obj: data to be saved as a pickle file
+    :param f_name: files should only be existing in the cache directory
+    :return:
+    """
+    with open(os.path.join(CACHE_DIR, f_name), "wb") as out_f:
+        pickle.dump(obj, out_f)
+
+
+def load_pickle(f_name):
+    path = os.path.join(CACHE_DIR, f_name)
+    return (
+        pickle.load(open(path, "rb")) if os.path.exists(path) else print("The file does not exist.")
+    )
+
+
+def save_json(obj, f_name):
+    with open(os.path.join(CACHE_DIR, f_name), "w") as out_f:
+        json.dump(obj, out_f, indent=4)
 
 
 def line_generator(in_file: str | os.PathLike) -> Iterator[list]:
@@ -42,7 +75,6 @@ def line_generator(in_file: str | os.PathLike) -> Iterator[list]:
     """
     with open(in_file, "r") as in_f:
         reader = csv.reader(in_f)
-        # skip the header
         next(reader)
         for line in reader:
             yield line
@@ -83,15 +115,15 @@ def assign_to_xrefs_if_available(node: dict, key: str, val: str | int, transform
         node["xrefs"][key] = transform(val) if transform else val
 
 
-def get_taxon_info(file_path: str | os.PathLike) -> list:
-    """retrieves taxonomic information for a given list of taxon IDs from micro_metabolic.csv
+def get_taxon_info(taxids: list) -> list:
+    """retrieves taxonomic information for a given list of taxon IDs from disease_species.csv
+
     This function reads taxon IDs, removes duplicates, and queries taxonomic info from biothings_client
     to retrieve detailed taxonomic information including scientific name, parent taxid, lineage, and rank.
 
-    :param file_path: Path to micro_metabolic.csv containing the taxids.
+    :param taxids:
     :return: A list of dictionaries containing taxonomic information.
     """
-    taxids = [line[9] for line in line_generator(file_path)]
     taxids = set(taxids)
     t = biothings_client.get_client("taxon")
     taxon_info = t.gettaxa(taxids, fields=["scientific_name", "parent_taxid", "lineage", "rank"])
@@ -185,36 +217,34 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
             "subject": subject_node,
         }
         if ":" in object_node["id"] and ":" in subject_node["id"]:
-            output_dict["_id"] = (
-                f"{subject_node['id'].split(':')[1].strip()}_associated_with_{object_node['id'].split(':')[1].strip()}"
-            )
+            output_dict[
+                "_id"
+            ] = f"{subject_node['id'].split(':')[1].strip()}_associated_with_{object_node['id'].split(':')[1].strip()}"
         elif ":" not in object_node["id"] and ":" in subject_node["id"]:
-            output_dict["_id"] = (
-                f"{subject_node['id'].split(':')[1].strip()}_associated_with_{object_node['id']}"
-            )
+            output_dict[
+                "_id"
+            ] = f"{subject_node['id'].split(':')[1].strip()}_associated_with_{object_node['id']}"
         elif ":" in object_node["id"] and ":" not in subject_node["id"]:
-            output_dict["_id"] = (
-                f"{subject_node['id']}_associated_with_{object_node['id'].split(':')[1].strip()}"
-            )
+            output_dict[
+                "_id"
+            ] = f"{subject_node['id']}_associated_with_{object_node['id'].split(':')[1].strip()}"
         else:
             output_dict["_id"] = f"{subject_node['id']}_associated_with_{object_node['id']}"
 
         yield output_dict
 
 
-def load_micro_meta_data() -> Iterator[dict]:
+def load_micro_meta_data(f_path) -> Iterator[dict]:
     """loads and yields unique microbe-metabolite data records from micro_metabolic.csv file
     This function constructs the file path to the micro_metabolic.csv file,
     retrieves node information using the `get_node_info` function, and yields unique records based on `_id`.
 
     :return: An iterator of dictionaries containing microbe-metabolite data.
     """
-    path = os.getcwd()
-    file_path = os.path.join(path, "data", "micro_metabolic.csv")
-    assert os.path.exists(file_path), f"The file {file_path} does not exist."
+    assert os.path.exists(Path(f_path))
 
     dup_ids = set()
-    recs = get_node_info(file_path)
+    recs = get_node_info(f_path)
     for rec in recs:
         if rec["_id"] not in dup_ids:
             dup_ids.add(rec["_id"])
@@ -222,7 +252,8 @@ def load_micro_meta_data() -> Iterator[dict]:
 
 
 # if __name__ == "__main__":
-# from collections import Counter
+#     path = os.getcwd()
+#     file_path = os.path.join(path, "data", "micro_metabolic.csv")
 # micro_meta_data = load_micro_meta_data()
 # type_list = [obj["subject"]["type"] for obj in micro_meta_data]
 # type_counts = Counter(type_list)
