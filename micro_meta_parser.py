@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 
 import aiohttp
-import biothings_client
+import biothings_client as bt
 from dotenv import load_dotenv
 from ete3 import NCBITaxa
 from tqdm.asyncio import tqdm_asyncio
@@ -130,7 +130,7 @@ def get_taxon_info(taxids: list) -> list:
     :return: A list of dictionaries containing taxonomic information.
     """
     taxids = set(taxids)
-    t = biothings_client.get_client("taxon")
+    t = bt.get_client("taxon")
     taxon_info = t.gettaxa(taxids, fields=["scientific_name", "parent_taxid", "lineage", "rank"])
     return taxon_info
 
@@ -160,29 +160,24 @@ async def pug_query_pubchem_description(
     description = None
     synonyms = []
 
+    sections = data.get("Record", {}).get("Section", [])
     for sec in sections:
-        heading = sec.get("TOCHeading", "")
-        if heading == "Names and Identifiers":
-            for sub in sec.get("Section", []):
-                if sub.get("TOCHeading") == "Name and Identifiers":
-                    for info in sub.get("Information", []):
-                        for mark in info.get("Value", {}).get("StringWithMarkup", []):
-                            text = mark.get("String")
-                            if text:
-                                description = text
-                                break
-                        if description:
-                            break
-                if description:
-                    break
-
-        elif heading == "Synonyms":
+        if sec.get("TOCHeading") == "Names and Identifiers":
             for sub in sec.get("Section", []):
                 for info in sub.get("Information", []):
-                    for mark in info.get("Value", {}).get("StringWithMarkup", []):
-                        text = mark.get("String")
-                        if text:
-                            synonyms.append(text)
+                    markup = info.get("Value", {}).get("StringWithMarkup", [])
+                    if markup:
+                        descr = markup[0].get("String")
+                        if descr:
+                            description = descr.strip()
+        elif sec.get("TOCHeading") == "Synonyms":
+            for sub in sec.get("Section", []):
+                for info in sub.get("Information", []):
+                    markup = info.get("Value", {}).get("StringWithMarkup", [])
+                    if markup:
+                        synonym = markup[0].get("String")
+                        if synonym:
+                            synonyms.append(synonym)
 
     return cid, {
         "id": f"PUBCHEM.COMPOUND:{cid}",
@@ -249,6 +244,42 @@ def get_organism_type(node) -> str:
             return organism_type
 
     return "Other"
+
+
+def bt_get_mw_logp(cids: list):
+    cids = set(cids)
+    t = bt.get_client("chem")
+    get_chem = t.querymany(
+        cids,
+        scopes="pubchem.cid",
+        fields=["pubchem.molecular_weight", "pubchem.monoisotopic_weight", "pubchem.xlogp"],
+    )
+
+    q_out = {}
+    for q in get_chem:
+        if "notfound" in q:
+            continue
+
+        pub = q.get("pubchem")
+        if isinstance(pub, list):
+            info = pub[0]
+        elif isinstance(pub, dict):
+            info = pub
+        else:
+            continue
+
+        mw = info.get("molecular_weight")
+        mono = info.get("monoisotopic_weight")
+        logp = info.get("xlogp")
+        q_out[q["query"]] = {
+            "molecular_weight": {
+                "average_molecular_weight": mw,
+                "monoisotopic_molecular_weight": mono,
+            },
+            "xlogp": logp,
+        }
+
+    return q_out
 
 
 def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
