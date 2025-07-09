@@ -7,6 +7,7 @@ urls=(
   "http://gepa.org.cn/static2/file/meta_gene_net.csv"
   "http://bigg.ucsd.edu/static/namespace/bigg_models_metabolites.txt"
   "https://evs.nci.nih.gov/ftp1/NCI_Thesaurus/Thesaurus_25.06e.FLAT.zip"
+  "https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz"
 )
 
 for url in "${urls[@]}"; do
