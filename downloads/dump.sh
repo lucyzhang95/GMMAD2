@@ -5,6 +5,7 @@ urls=(
   "http://gepa.org.cn/static2/file/micro_metabolic.csv"
   "http://gepa.org.cn/static2/file/disease_species.csv"
   "http://gepa.org.cn/static2/file/meta_gene_net.csv"
+  "http://bigg.ucsd.edu/static/namespace/bigg_models_metabolites.txt"
 )
 
 for url in "${urls[@]}"; do
