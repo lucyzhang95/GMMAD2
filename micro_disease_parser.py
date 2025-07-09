@@ -4,6 +4,7 @@ import os
 import pickle
 import tarfile
 from collections.abc import Iterator
+from pathlib import Path
 
 import aiohttp
 import biothings_client
@@ -249,6 +250,25 @@ def get_organism_type(node) -> str:
     return "Other"
 
 
+def remove_empty_none_values(obj):
+    if isinstance(obj, dict):
+        cleaned = {}
+        for k, v in obj.items():
+            v_clean = remove_empty_none_values(v)
+            if v_clean not in (None, {}, []):
+                cleaned[k] = v_clean
+        return cleaned
+
+    if isinstance(obj, list):
+        cleaned_list = []
+        for v in obj:
+            v_clean = remove_empty_none_values(v)
+            if v_clean not in (None, {}, []):
+                cleaned_list.append(v_clean)
+        return cleaned_list
+    return obj
+
+
 def cache_data(f_path, gzip_path="taxdump.tar.gz"):
     # cache all taxon info including lineage, rank, parent_taxid from disease_species.csv
     taxids = sorted(set([line[5] for line in line_generator_4_midi(f_path)]))
@@ -290,54 +310,61 @@ def get_node_info(f_path: str | os.PathLike) -> Iterator[dict]:
     :param f_path: Path to the disease_species.csv file
     :return: An iterator of dictionaries containing node information.
     """
-    taxon_info = {
-        int(taxon["query"]): taxon
-        for taxon in get_taxon_info(f_path)
-        if "notfound" not in taxon.keys()
-    }
+    if not os.path.exists(
+        Path(os.path.join("cache", "gmmad2_microbe_disease_taxon_info_w_descr.pkl"))
+    ):
+        print("Taxon info not found in cache, running cache_data()...")
+        cache_data(f_path)
+
+    taxon_info = load_pickle("gmmad2_microbe_disease_taxon_info_w_descr.pkl")
     for line in line_generator_4_midi(f_path):
         # create object node (diseases)
         object_node = {
-            "id": f"MESH:{line[0]}",
-            "name": line[1].lower(),
-            "mesh": line[0],
+            "id": f"MESH:{line[1]}",
+            "name": line[2].lower(),
             "type": "biolink:Disease",
-            "description": line[17],
+            "description": line[18],
+            "xrefs": {"mesh": f"MESH:{line[1]}"},
         }
+        object_node = remove_empty_none_values(object_node)
 
         # create subject node (microbes)
-        taxid = int(line[4])
-        subject_node = {
-            "id": f"taxid:{taxid}",
-            "taxid": taxid,
-            "name": None,
-            "original_name": line[2].lower(),
-            "type": "biolink:OrganismTaxon",
-        }
-        if subject_node["taxid"] in taxon_info:
-            subject_node["name"] = taxon_info[subject_node["taxid"]]["scientific_name"]
-            subject_node["parent_taxid"] = taxon_info[subject_node["taxid"]]["parent_taxid"]
-            subject_node["lineage"] = taxon_info[subject_node["taxid"]]["lineage"]
-            subject_node["rank"] = taxon_info[subject_node["taxid"]]["rank"]
+        taxid = line[5]
+        if taxid in taxon_info:
+            subject_node = {
+                "id": f"NCBITaxon:{taxon_info[taxid].get('_id')}",
+                "taxid": taxon_info[taxid].get("_id"),
+                "name": taxon_info[taxid].get("scientific_name").lower(),
+                "original_name": line[3].lower(),
+                "description": taxon_info[taxid].get("description"),
+                "parent_taxid": taxon_info[taxid].get("parent_taxid"),
+                "lineage": taxon_info[taxid].get("lineage", []),
+                "rank": taxon_info[taxid].get("rank"),
+                "type": "biolink:OrganismTaxon",
+                "organism_type": None,
+                "xrefs": taxon_info[taxid].get("xrefs", {}),
+            }
             subject_node["organism_type"] = get_organism_type(subject_node)
+            subject_node = remove_empty_none_values(subject_node)
 
         # association node
         # includes disease and health sample sizes, microbial abundance mean, median, sd, qualifier
         association_node = {
             "predicate": "OrganismalEntityAsAModelOfDiseaseAssociation",
             "control_name": "healthy control",
-            "qualifier": line[16].lower(),
-            "qualifier_ratio": line[15],
-            "disease_sample_size": line[5],
-            "disease_abundance_mean": line[6],
-            "disease_abundance_median": line[7],
-            "disease_abundance_sd": line[8],
-            "healthy_sample_size": line[11],
-            "healthy_abundance_mean": line[12],
-            "healthy_abundance_median": line[13],
-            "healthy_abundance_sd": line[14],
-            "infores": "GMMAD2-GMrepo",  # knowledge source
+            "qualifier": line[17].lower(),
+            "qualifier_ratio": line[16],
+            "disease_sample_size": line[6],
+            "disease_abundance_mean": line[7],
+            "disease_abundance_median": line[8],
+            "disease_abundance_sd": line[9],
+            "healthy_sample_size": line[12],
+            "healthy_abundance_mean": line[13],
+            "healthy_abundance_median": line[14],
+            "healthy_abundance_sd": line[15],
+            "infores": "GMMAD2-GMrepo",  # original knowledge source
         }
+        association_node = remove_empty_none_values(association_node)
 
         output_dict = {
             "_id": f"{subject_node['id'].split(':')[1]}_OrganismalEntityAsAModelOfDiseaseAssociation_{object_node['id'].split(':')[1]}",
