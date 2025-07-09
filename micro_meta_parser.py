@@ -4,10 +4,13 @@ import json
 import os
 import pickle
 import tarfile
+import time
+import urllib.parse
 import uuid
 from collections import Counter
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Dict, List, Tuple
 
 import aiohttp
 import biothings_client
@@ -129,6 +132,60 @@ def get_taxon_info(taxids: list) -> list:
     t = biothings_client.get_client("taxon")
     taxon_info = t.gettaxa(taxids, fields=["scientific_name", "parent_taxid", "lineage", "rank"])
     return taxon_info
+
+
+async def pug_query_pubchem_description(
+    cid: int,
+    session: aiohttp.ClientSession,
+    sem: asyncio.Semaphore,
+) -> Tuple[int, Dict[str, str] | None]:
+    url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/{cid}/JSON"
+
+    async with sem:
+        async with session.get(url, timeout=30) as resp:
+            resp.raise_for_status()
+            data = await resp.json()
+
+    sections = data.get("Record", {}).get("Section", [])
+    for sec in sections:
+        if sec.get("TOCHeading") == "Names and Identifiers":
+            for sub in sec.get("Section", []):
+                for info in sub.get("Information", []):
+                    markup = info.get("Value", {}).get("StringWithMarkup", [])
+                    if isinstance(markup, list) and markup:
+                        descr = markup[0].get("String")
+                        if descr:
+                            return cid, {
+                                "id": f"PUBCHEM.COMPOUND:{cid}",
+                                "description": descr,
+                            }
+
+
+async def get_batch_pubchem_descriptions_async(
+    cids: List[int],
+    workers: int = 5,
+) -> Dict[int, Dict[str, str]]:
+    workers = min(workers, 5)
+    sem = asyncio.Semaphore(workers)
+    results: Dict[int, Dict[str, str]] = {}
+    connector = aiohttp.TCPConnector(limit_per_host=workers)
+
+    async with aiohttp.ClientSession(connector=connector) as session:
+        for i in range(0, len(cids), workers):
+            t0 = time.perf_counter()
+            chunk = cids[i : i + workers]
+            tasks = [pug_query_pubchem_description(cid, session, sem) for cid in chunk]
+            for cid, payload in await asyncio.gather(*tasks):
+                if payload:
+                    results[cid] = payload
+            elapsed = time.perf_counter() - t0
+            if elapsed < 1.0:
+                await asyncio.sleep(1.0 - elapsed)
+    return results
+
+
+def get_pubchem_descriptions(cids: List[int], workers: int = 3):
+    return asyncio.run(get_batch_pubchem_descriptions_async(cids, workers))
 
 
 def get_bigg_metabolite_mapping(in_f):
