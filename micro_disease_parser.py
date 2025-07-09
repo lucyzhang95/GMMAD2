@@ -414,8 +414,8 @@ if __name__ == "__main__":
     unique_ids = set(_ids)
     unique_disease_ids = set(disease_ids)
 
-    print(f"total records: {len(_ids)}")
-    print(f"total records without duplicates: {len(unique_ids)}")
+    print(f"Total records: {len(_ids)}")
+    print(f"Total records without duplicates: {len(unique_ids)}")
     print(f"Number of unique disease IDs: {len(unique_disease_ids)}")
 
     type_list = [obj["subject"]["organism_type"] for obj in recs]
