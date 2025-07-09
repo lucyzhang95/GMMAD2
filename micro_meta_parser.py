@@ -323,78 +323,7 @@ def get_taxon_names(taxon_info: dict) -> list[str]:
     return list(taxon_names)
 
 
-async def fetch_ncit_description(
-    session: aiohttp.ClientSession, name: str, sem: asyncio.Semaphore
-) -> tuple[str, dict]:
-    NCIT_API_KEY = os.getenv("NCIT_API_KEY")
-    SEARCH_URL = "https://data.bioontology.org/search"
-    params = {
-        "q": name,
-        "ontologies": "NCIT",
-        "apikey": NCIT_API_KEY,
-    }
-    async with sem:
-        async with session.get(SEARCH_URL, params=params) as resp:
-            resp.raise_for_status()
-            data = await resp.json()
-    for result in data.get("collection", []):
-        if not result:
-            continue
-        pref_label = result.get("prefLabel", "").lower()
-        if pref_label != name:
-            continue
-        definition = result.get("definition", [])
-        ncit_id = result.get("@id", "").split("#")[-1]
-        return name, {
-            "description": f"{definition[0]} [NCIT]" if definition else "",
-            "xrefs": {"ncit": ncit_id},
-        }
 
-
-async def get_ncit_taxon_description_async(taxon_names, max_concurrent=5):
-    unique_names = {n.lower() for n in taxon_names}
-    sem = asyncio.Semaphore(max_concurrent)
-    connector = aiohttp.TCPConnector(limit_per_host=max_concurrent)
-    async with aiohttp.ClientSession(connector=connector) as session:
-        tasks = [fetch_ncit_description(session, name, sem) for name in unique_names]
-        results = await asyncio.gather(*tasks)
-    return {name: data for item in results if item for name, data in (item,)}
-
-
-def get_ncit_taxon_description(taxon_names):
-    """
-
-    :param taxon_names:
-    :return:
-    {
-       "550":{
-          "query":"550",
-          "_id":"550",
-          "_version":1,
-          "lineage":[
-             550,
-             354276,
-             547,
-             543,
-             91347,
-             1236,
-             1224,
-             3379134,
-             2,
-             131567,
-             1
-          ],
-          "parent_taxid":354276,
-          "rank":"species",
-          "scientific_name":"enterobacter cloacae",
-          "description":"A species of facultatively anaerobic, Gram negative, rod shaped bacterium in the phylum Proteobacteria. This species is motile by peritrichous flagella, oxidase, urease and indole negative, catalase positive, reduces nitrate, does not degrade pectate and produces acid from sorbitol. E. cloacae is associated with hospital-acquired urinary and respiratory tract infections and is used in industry for explosives biodegradation. [NCIT]",
-          "xrefs": {
-             "ncit":"C86360"
-          }
-       }
-    }
-    """
-    return asyncio.run(get_ncit_taxon_description_async(taxon_names))
 
 
 def add_description2taxon_info(taxon_info: dict, descriptions: dict) -> dict:
