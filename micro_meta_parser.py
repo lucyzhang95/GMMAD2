@@ -212,6 +212,26 @@ def get_bigg_metabolite_mapping(in_f):
     return bigg_map
 
 
+def get_organism_type(node) -> str:
+    """
+    Inspect node['lineage'] for known taxids.
+    Return the matching biolink CURIE, or Other if no match.
+    Types include: 3 domains of life (Bacteria, Archaea, Eukaryota) and Virus.
+    """
+    taxon_map = {
+        2: "biolink:Bacterium",
+        2157: "Archaeon",
+        2759: "Eukaryote",
+        10239: "biolink:Virus",
+    }
+
+    for taxid, organism_type in taxon_map.items():
+        if taxid in node.get("lineage", []):
+            return organism_type
+
+    return "Other"
+
+
 def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
     """generates node information from micro_metabolic.csv.
     This function reads data from micro_metabolic.csv, processes taxonomic information,
@@ -271,19 +291,6 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
             subject_node["lineage"] = taxon_info[subject_node["taxid"]]["lineage"]
             subject_node["rank"] = taxon_info[subject_node["taxid"]]["rank"]
 
-        # categorize subject microbial super kingdom type
-        if "lineage" in subject_node:
-            if 2 in subject_node["lineage"]:
-                subject_node["type"] = "biolink:Bacterium"
-            elif 10239 in subject_node["lineage"]:
-                subject_node["type"] = "biolink:Virus"
-            elif 4751 in subject_node["lineage"]:
-                subject_node["type"] = "biolink:Fungus"
-            elif 2157 in subject_node["lineage"]:
-                subject_node["type"] = "biolink:Archaea"
-            else:
-                subject_node["type"] = "biolink:OrganismalEntity"
-
         # association node has the reference and source of metabolites
         association_node = {
             "predicate": "biolink:associated_with",
@@ -314,6 +321,8 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
             output_dict["_id"] = f"{subject_node['id']}_associated_with_{object_node['id']}"
 
         yield output_dict
+        
+
 
 
 def load_micro_meta_data(f_path) -> Iterator[dict]:
