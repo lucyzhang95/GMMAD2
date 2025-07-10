@@ -268,10 +268,12 @@ def get_organism_type(node) -> str:
         10239: "biolink:Virus",
     }
 
+    lineage = node.get("lineage")
+    if not isinstance(lineage, list):
+        return "Other"
     for taxid, organism_type in taxon_map.items():
-        if taxid in node.get("lineage", []):
+        if taxid in lineage:
             return organism_type
-
     return "Other"
 
 
@@ -645,7 +647,9 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
                 "id": str(uuid.uuid4()),
                 "original_name": line[2].lower(),
                 "type": "biolink:OrganismTaxon",
+                "organism_type": "Other",
             }
+            subject_node = remove_empty_none_values(subject_node)
 
         # association node has the habitat and source of the interaction
         evidence_map = {
