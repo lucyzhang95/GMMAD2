@@ -270,7 +270,9 @@ def remove_empty_none_values(obj):
     return obj
 
 
-def cache_data(f_path, gzip_path=os.path.join("downloads", "taxdump.tar.gz")):
+def cache_data(f_path, gzip_path=None):
+    if gzip_path is None:
+        gzip_path = os.path.join("downloads", "taxdump.tar.gz")
     # cache all taxon info including lineage, rank, parent_taxid from disease_species.csv
     taxids = sorted(set([line[5] for line in line_generator_4_midi(f_path)]))
     print(f"Total unique taxids: {len(taxids)}")
