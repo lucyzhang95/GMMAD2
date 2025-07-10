@@ -67,7 +67,7 @@ def save_json(obj, f_name):
         json.dump(obj, out_f, indent=4)
 
 
-def line_generator_4_midi(in_file: str | os.PathLike) -> Iterator[list[str]]:
+def line_generator_4_midi(in_file: str | os.PathLike, skip_header=True) -> Iterator[list[str]]:
     """Yield each CSV line as a list of exactly 24 fields,
     rejoining misaligned columns with commas for the 'disease' and 'disease_info' columns.
     """
@@ -77,7 +77,11 @@ def line_generator_4_midi(in_file: str | os.PathLike) -> Iterator[list[str]]:
     FIXED_COUNT = 15
 
     with open(in_file, "r", encoding="utf-8") as f:
-        next(f)
+        if skip_header:
+            next(f)
+        else:
+            pass
+
         for line in f:
             parts = [part.strip() for part in line.split(",")]
             if len(parts) == EXPECTED_COUNT:
