@@ -6,31 +6,30 @@ from collections.abc import Iterator
 import biothings_client
 
 """
-column names with index:
 {
-    0: 'id', internal id
-    1: 'g_meta', internal id
-    2: 'compound', name
-    3: 'pubchem_id', not available exists
-    4: 'formula', chemical formula
-    5: 'kegg_id', 
-    6: 'HMDBID', not available exists
-    7: 'drug_id', not available exists
-    8: 'drug_name', not available exists
-    9: 'Origin', list of items
-    10: 'smiles_sequence', 
-    11: 'gene_id', internal id
-    12: 'gene', symbol
-    13: 'ensembl_id', 
-    14: 'NCBI',
-    15: 'HGNC',
-    16: 'UniProt',
-    17: 'protein_size', 
-    18: 'annonation', description
-    19: 'score', ?
-    20: 'alteration', qualifier, Unknown exists
-    21: 'PMID', not available exists
-    22: 'source', infores
+ 0: 'id',   # '1001'
+ 1: 'g_meta',   # 'meta195'
+ 2: 'compound', # '1,4-Dihydronicotinamide adenine dinucleotide'
+ 3: 'pubchem_id',   # '439153'
+ 4: 'formula',  # 'C21H29N7O14P2'
+ 5: 'kegg_id',  # 'C00004' or 'not available'
+ 6: 'HMDBID',   # 'HMDB0001487' or 'not available'
+ 7: 'drug_id',  # 'DB00157' or 'Not available'
+ 8: 'drug_name',    # 'NADH' or 'Not available'
+ 9: 'Origin',   # 'Microbiota; Food related; Drug related' or 'Unknown'
+ 10: 'smiles_sequence', # 'C1C=CN(C=C1C(=O)N)C2C(C(C(O2)COP(=O)(O)OP(=O)(O)OCC3C(C(C(O3)N4C=NC5=C(N=CN=C54)N)O)O)O)O'
+ 11: 'gene_id', # 'g5070'
+ 12: 'gene',    # 'NSDHL' or 'Unknow'
+ 13: 'ensembl_id',  # 'ENSG00000147383' or 'Unknow'
+ 14: 'NCBI',    # '50814' or 'Unknow'
+ 15: 'HGNC',    # '13398' or 'Unknow'
+ 16: 'UniProt', # 'Q15738' or 'Unknow'
+ 17: 'protein_size',    # '373' or 'Unknow'
+ 18: 'annonation',  # "The protein encoded by this gene is localized in the endoplasmic reticulum ...' or 'Unknow'
+ 19: 'score',   # '0.95' or 'Unknow'
+ 20: 'alteration',  # ['Unknown', 'elevated', 'reduced', 'target', 'Inhibitor', 'Activator']
+ 21: 'PMID',   # 'Not available' or 'Unknow'
+ 22: 'source'   # 'stitch, drugbank' or 'Unknow'
 }
 """
 
