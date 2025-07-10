@@ -706,10 +706,15 @@ def load_micro_meta_data(f_path) -> Iterator[dict]:
             dup_ids.add(rec["_id"])
             yield rec
 
+    # for rec in get_node_info(f_path):
+    #     yield rec
+
 
 if __name__ == "__main__":
     file_path = os.path.join("downloads", "micro_metabolic.csv")
     micro_meta_data = [obj for obj in load_micro_meta_data(file_path)]
+    save_pickle(micro_meta_data, "gmmad2_microbe_metabolite.pkl")
+
     type_list = [obj["subject"].get("organism_type") for obj in micro_meta_data]
     type_counts = Counter(type_list)
     print(type_counts)
@@ -718,5 +723,5 @@ if __name__ == "__main__":
     for obj in micro_meta_data:
         # print(obj)
         _ids.append(obj["_id"])
-    print(f"total records: {len(_ids)}")
-    print(f"total records without duplicates: {len(set(_ids))}")
+    print(f"Total records: {len(_ids)}")
+    print(f"Total records without duplicates: {len(set(_ids))}")
