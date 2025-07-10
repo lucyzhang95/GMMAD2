@@ -203,6 +203,7 @@ async def get_batch_pubchem_descriptions_async(
     workers = min(workers, 5)
     sem = asyncio.Semaphore(workers)
     connector = aiohttp.TCPConnector(limit_per_host=workers)
+    cids = list(set(cids))
 
     results = {}
     async with aiohttp.ClientSession(connector=connector) as session:
@@ -462,6 +463,13 @@ def add_description2taxon_info(taxon_info: dict, descriptions: dict) -> dict:
         descr_info = descriptions.get(name, {})
         info.update(descr_info)
     return taxon_info
+
+
+def cache_data(f_path):
+    # cache metabolite descriptions
+    pubchem_cids = [line[6] for line in line_generator(f_path) if line[6] and line[6] != "not available"]
+    pubchem_descr = get_pubchem_descriptions(pubchem_cids)
+    
 
 
 def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
