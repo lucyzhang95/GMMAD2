@@ -712,7 +712,7 @@ if __name__ == "__main__":
 
     _ids = []
     for obj in micro_meta_data:
-        print(obj)
+        # print(obj)
         _ids.append(obj["_id"])
     print(f"total records: {len(_ids)}")
     print(f"total records without duplicates: {len(set(_ids))}")
