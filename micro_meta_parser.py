@@ -72,17 +72,22 @@ def save_json(obj, f_name):
         json.dump(obj, out_f, indent=4)
 
 
-def line_generator(in_file: str | os.PathLike, delimiter=",") -> Iterator[list]:
+def line_generator(in_file: str | os.PathLike, delimiter=",", skip_header = True) -> Iterator[list]:
     """generates lines from a CSV file, yielding each line as a list of strings
     This function opens the specified CSV file, skips the header row, and yields each subsequent line as a list of strings.
 
+    :param skip_header: 
     :param in_file: The path to the CSV file.
     :param delimiter: The character used to separate values in the CSV file (default is comma).
     :return: An iterator that yields each line of the CSV file as a list of strings.
     """
     with open(in_file, "r") as in_f:
         reader = csv.reader(in_f, delimiter=delimiter)
-        next(reader)
+        if skip_header:
+            next(reader)
+        else:
+            pass
+        
         for line in reader:
             yield line
 
