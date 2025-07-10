@@ -256,7 +256,7 @@ def get_organism_type(node) -> str:
 
 
 def bt_get_mw_logp(cids: list):
-    cids = set(cids)
+    cids = sorted(set(cids))
     t = bt.get_client("chem")
     get_chem = t.querymany(
         cids,
@@ -465,7 +465,16 @@ def add_description2taxon_info(taxon_info: dict, descriptions: dict) -> dict:
     return taxon_info
 
 
-def cache_data(f_path, gzip_path):
+def cache_data(
+    f_path,
+    gzip_path=None,
+    bigg_path=None,
+):
+    if gzip_path is None:
+        gzip_path = os.path.join("downloads", "taxdump.tar.gz")
+    if bigg_path is None:
+        bigg_path = os.path.join("downloads", "bigg_models_metabolites.txt")
+        
     # cache metabolite descriptions
     pubchem_cids = [
         line[6] for line in line_generator(f_path) if line[6] and line[6] != "not available"
@@ -475,9 +484,18 @@ def cache_data(f_path, gzip_path):
     print(f"Total pubchem_cid with descriptions: {len(pubchem_descr)}")
     save_pickle(pubchem_descr, "gmmad2_micro_meta_description.pkl")
 
+    # cache molecular weight and xlogp
+    pubchem_mw_logp = bt_get_mw_logp(pubchem_cids)
+    print(f"Total pubchem_cid with molecular weight and xlogp: {len(pubchem_mw_logp)}")
+    save_pickle(pubchem_mw_logp, "gmmad2_micro_meta_pubchem_mw.pkl")
+
+    # cache bigg metabolite mapping
+    bigg_mapping = get_bigg_metabolite_mapping(bigg_path)
+    save_pickle(bigg_mapping, "gmmad2_micro_meta_bigg_mapping.pkl")
+
     # cache taxon info
     taxids = [line[9] for line in line_generator(f_path) if line[9] and line[9] != "not available"]
-    print(f"Total unique taxids: {len(taxids)}")
+    print(f"Total unique taxids: {len(set(taxids))}")
     taxon_info_q = get_taxon_info(taxids)
     taxon_info = {t["query"]: t for t in taxon_info_q if "notfound" not in t.keys()}
     print(f"Biothings mapped {len(taxon_info)} taxids.")
@@ -503,7 +521,7 @@ def cache_data(f_path, gzip_path):
     ncit_descriptions = get_ncit_taxon_description(taxon_names)
     print(f"NCIT descriptions found for {len(ncit_descriptions)} taxon names.")
     taxon_info_w_descr = add_description2taxon_info(taxon_info, ncit_descriptions)
-    save_pickle(taxon_info_w_descr, "gmmad2_microbe_disease_taxon_info_w_descr.pkl")
+    save_pickle(taxon_info_w_descr, "gmmad2_micro_meta_taxon_info_w_descr.pkl")
 
 
 def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
@@ -514,11 +532,13 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
     :param file_path: Path to the micro_metabolic.csv file
     :return: An iterator of dictionaries containing node information.
     """
-    taxon_info = {
-        int(taxon["query"]): taxon
-        for taxon in get_taxon_info(file_path)
-        if "notfound" not in taxon.keys()
-    }
+    if not os.path.exists(Path(os.path.join("cache", "gmmad2_micro_meta_taxon_info_w_descr.pkl"))):
+        print("Taxon info not found in cache, running cache_data()...")
+        cache_data(f_path)
+
+    taxon_info = load_pickle("gmmad2_micro_meta_taxon_info_w_descr.pkl")
+    pubchem_descr = load_pickle("gmmad2_micro_meta_description.pkl")
+    pubchem_mw = load_pickle("gmmad2_micro_meta_pubchem_mw.pkl")
 
     for line in line_generator(file_path):
         # create object node (metabolites)
@@ -614,9 +634,9 @@ def load_micro_meta_data(f_path) -> Iterator[dict]:
             yield rec
 
 
-# if __name__ == "__main__":
-#     path = os.getcwd()
-#     file_path = os.path.join(path, "data", "micro_metabolic.csv")
+if __name__ == "__main__":
+    file_path = os.path.join("downloads", "micro_metabolic.csv")
+
 # micro_meta_data = load_micro_meta_data()
 # type_list = [obj["subject"]["type"] for obj in micro_meta_data]
 # type_counts = Counter(type_list)
