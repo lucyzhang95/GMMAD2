@@ -132,12 +132,14 @@ def get_primary_id(line, bigg_map):
             key = "smiles"
         elif prefix == "BIGG.METABOLITE":
             key = "bigg"
+        else:
+            continue
 
         if primary_id is None:
             primary_id = curie
         xrefs.setdefault(key, curie)
 
-        return primary_id, xrefs
+    return primary_id, xrefs
 
 
 def get_taxon_info(taxids: list) -> list:
@@ -605,7 +607,11 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
             "xrefs": {},
         }
 
-        primary_id, xrefs = get_primary_id(line, bigg_mapping)
+        id_xrefs = get_primary_id(line, bigg_mapping)
+        if id_xrefs:
+            primary_id, xrefs = id_xrefs
+        else:
+            primary_id, xrefs = None, {}
         object_node["id"] = primary_id if primary_id else str(uuid.uuid4())
         object_node["xrefs"] = xrefs
         object_node = remove_empty_none_values(object_node)
@@ -699,11 +705,10 @@ def load_micro_meta_data(f_path) -> Iterator[dict]:
 
 if __name__ == "__main__":
     file_path = os.path.join("downloads", "micro_metabolic.csv")
-    micro_meta_data = load_micro_meta_data(file_path)
-    type_list = [obj["subject"]["type"] for obj in micro_meta_data]
+    micro_meta_data = [obj for obj in load_micro_meta_data(file_path)]
+    type_list = [obj["subject"].get("organism_type") for obj in micro_meta_data]
     type_counts = Counter(type_list)
-    for value, count in type_counts.items():
-        print(f"{value}: {count}")
+    print(type_counts)
 
     _ids = []
     for obj in micro_meta_data:
