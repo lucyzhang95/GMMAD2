@@ -569,6 +569,10 @@ def cache_data(
     save_pickle(taxon_info_w_descr, "gmmad2_micro_meta_taxon_info_w_descr.pkl")
 
 
+def get_suffix(identifier: str) -> str:
+    return identifier.split(":", 1)[1].strip() if ":" in identifier else identifier.strip()
+
+
 def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
     """generates node information from micro_metabolic.csv.
     This function reads data from micro_metabolic.csv, processes taxonomic information,
@@ -608,11 +612,13 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
 
         # create subject node (microbes)
         taxid = (
-            line[9] if line[9] and line[9] != "not available"
-            else line[16] if line[16] and line[16] != "not available"
+            line[9]
+            if line[9] and line[9] != "not available"
+            else line[16]
+            if line[16] and line[16] != "not available"
             else None
         )
-        if taxid  and taxid in taxon_info:
+        if taxid and taxid in taxon_info:
             subject_node = {
                 "id": f"NCBITaxon:{taxon_info[taxid].get('_id')}",
                 "taxid": int(taxon_info[taxid].get("_id")),
@@ -667,20 +673,9 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
             "object": object_node,
             "subject": subject_node,
         }
-        if ":" in object_node["id"] and ":" in subject_node["id"]:
-            output_dict[
-                "_id"
-            ] = f"{subject_node['id'].split(':')[1].strip()}_associated_with_{object_node['id'].split(':')[1].strip()}"
-        elif ":" not in object_node["id"] and ":" in subject_node["id"]:
-            output_dict[
-                "_id"
-            ] = f"{subject_node['id'].split(':')[1].strip()}_associated_with_{object_node['id']}"
-        elif ":" in object_node["id"] and ":" not in subject_node["id"]:
-            output_dict[
-                "_id"
-            ] = f"{subject_node['id']}_associated_with_{object_node['id'].split(':')[1].strip()}"
-        else:
-            output_dict["_id"] = f"{subject_node['id']}_associated_with_{object_node['id']}"
+        subject_suffix = get_suffix(subject_node["id"])
+        object_suffix = get_suffix(object_node["id"])
+        output_dict["_id"] = f"{subject_suffix}_has_metabolic_interaction_with_{object_suffix}"
 
         yield output_dict
 
@@ -704,17 +699,15 @@ def load_micro_meta_data(f_path) -> Iterator[dict]:
 
 if __name__ == "__main__":
     file_path = os.path.join("downloads", "micro_metabolic.csv")
-    cache_data(file_path)
+    micro_meta_data = load_micro_meta_data(file_path)
+    type_list = [obj["subject"]["type"] for obj in micro_meta_data]
+    type_counts = Counter(type_list)
+    for value, count in type_counts.items():
+        print(f"{value}: {count}")
 
-# micro_meta_data = load_micro_meta_data()
-# type_list = [obj["subject"]["type"] for obj in micro_meta_data]
-# type_counts = Counter(type_list)
-# for value, count in type_counts.items():
-#     print(f"{value}: {count}")
-
-# _ids = []
-# for obj in micro_meta_data:
-#     print(obj)
-#     _ids.append(obj["_id"])
-# print(f"total records: {len(_ids)}")
-# print(f"total records without duplicates: {len(set(_ids))}")
+    _ids = []
+    for obj in micro_meta_data:
+        print(obj)
+        _ids.append(obj["_id"])
+    print(f"total records: {len(_ids)}")
+    print(f"total records without duplicates: {len(set(_ids))}")
