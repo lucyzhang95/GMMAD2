@@ -6,21 +6,19 @@ def get_columns(df: pd.DataFrame) -> list:
 
 
 def check_missing_data(df: pd.DataFrame, choices=None):
-    default_choices = ["unknown", "missing", "none", "n/a", "null", "not available", ""]
-    lookup = {str(c).strip().lower() for c in (choices if choices is not None else default_choices)}
+    if choices is None:
+        choices = ["unknown", "missing", "none", "n/a", "null", "not available", ""]
+    lookup = {str(c).strip().lower() for c in choices}
 
     found_missing = {}
-    for col in get_columns(df):
-        missing_vals = set()
-        if df[col].isnull().any():
-            missing_vals.add(None)
-        for v in df[col].unique():
-            if pd.isnull(v):
-                continue
-            if str(v).strip().lower() in lookup:
-                missing_vals.update(v)
-
-        if missing_vals:
+    for col in df.columns:
+        is_na = df[col].isna()
+        is_custom_missing = pd.Series([False] * len(df), index=df.index)
+        if df[col].dtype == "object":
+            is_custom_missing = df[col].str.strip().str.lower().isin(lookup)
+        combined_mask = is_na | is_custom_missing
+        if combined_mask.any():
+            missing_vals = set(df.loc[combined_mask, col])
             found_missing[col] = missing_vals
 
     return found_missing
