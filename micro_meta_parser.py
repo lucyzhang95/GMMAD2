@@ -87,39 +87,57 @@ def line_generator(in_file: str | os.PathLike, delimiter=",") -> Iterator[list]:
             yield line
 
 
-def assign_col_val_if_available(node: dict, key: str, val: str | int, transform=None):
-    """assigns a value to a specified key in a dictionary if the value is available and not equal to "not available"
-    This function updates the given dictionary with the provided key and value.
-    It can also transform the value using a specified function before assigning it.
+def get_primary_id(line, bigg_map):
+    pubchem_id = line[6]
+    kegg_id = line[8]
+    smiles = line[18]
+    hmdb_id = line[19]
+    bigg_id = bigg_map.get(line[5].lower())
 
-    :param node: The dictionary to be updated.
-    :param key: The key to be assigned the value in the dictionary.
-    :param val: The value to be assigned to the key in the dictionary.
-    :param transform: An optional function to transform the value before assignment. If None, the value is assigned as is.
-    :return: None
-    """
-    if val and val != "not available":
-        node[key] = transform(val) if transform else val
+    # (line, prefix) pairs for ID hierarchy
+    id_hierarchy = [
+        (pubchem_id, "PUBCHEM.COMPOUND"),
+        (kegg_id, None),
+        (smiles, ""),
+        (hmdb_id, "HMDB"),
+        (bigg_id, "BIGG.METABOLITE"),
+    ]
 
+    def classify_kegg(val):
+        if val.startswith("C"):
+            return "KEGG.COMPOUND"
+        elif val.startswith("G"):
+            return "KEGG.GLYCAN"
+        elif val.startswith("D"):
+            return "KEGG.DRUG"
+        return "KEGG"
 
-def assign_to_xrefs_if_available(node: dict, key: str, val: str | int, transform=None):
-    """assigns a value to the 'xrefs' sub-dictionary of a given dictionary
-    This function checks if the 'xrefs' key exists in the given dictionary.
-    If not, it initializes 'xrefs' as an empty dictionary.
-    Then, it assigns the provided value to the specified key within the 'xrefs' dictionary
-    It can also transform the value using a specified function.
+    xrefs = {}
+    primary_id = None
 
-    :param node: The dictionary to be updated.
-    :param key: The key to be assigned the value in the 'xrefs' sub-dictionary.
-    :param val: The value to be assigned to the key in the 'xrefs' sub-dictionary.
-    :param transform: An optional function to transform the value before assignment. If None, the value is assigned as is.
-    :return: None
-    """
-    if val and val != "not available":
-        if "xrefs" not in node:
-            node["xrefs"] = {}
+    for val, prefix in id_hierarchy:
+        if not val or val.strip().lower() == "not available":
+            continue
+        if prefix is None and val == kegg_id:
+            prefix = classify_kegg(val)
 
-        node["xrefs"][key] = transform(val) if transform else val
+        curie = f"{prefix}:{val}" if prefix else val
+        if prefix == "PUBCHEM.COMPOUND":
+            key = "pubchem_cid"
+        elif prefix == "HMDB":
+            key = "hmdb"
+        elif prefix is not None and prefix.startswith("KEGG"):
+            key = "kegg"
+        elif prefix == "":
+            key = "smiles"
+        elif prefix == "BIGG.METABOLITE":
+            key = "bigg"
+
+        if primary_id is None:
+            primary_id = curie
+        xrefs.setdefault(key, curie)
+
+        return primary_id, xrefs
 
 
 def get_taxon_info(taxids: list) -> list:
@@ -465,6 +483,25 @@ def add_description2taxon_info(taxon_info: dict, descriptions: dict) -> dict:
     return taxon_info
 
 
+def remove_empty_none_values(obj):
+    if isinstance(obj, dict):
+        cleaned = {}
+        for k, v in obj.items():
+            v_clean = remove_empty_none_values(v)
+            if v_clean not in (None, {}, []):
+                cleaned[k] = v_clean
+        return cleaned
+
+    if isinstance(obj, list):
+        cleaned_list = []
+        for v in obj:
+            v_clean = remove_empty_none_values(v)
+            if v_clean not in (None, {}, []):
+                cleaned_list.append(v_clean)
+        return cleaned_list
+    return obj
+
+
 def cache_data(
     f_path,
     gzip_path=None,
@@ -474,7 +511,7 @@ def cache_data(
         gzip_path = os.path.join("downloads", "taxdump.tar.gz")
     if bigg_path is None:
         bigg_path = os.path.join("downloads", "bigg_models_metabolites.txt")
-        
+
     # cache metabolite descriptions
     pubchem_cids = [
         line[6] for line in line_generator(f_path) if line[6] and line[6] != "not available"
@@ -494,7 +531,15 @@ def cache_data(
     save_pickle(bigg_mapping, "gmmad2_micro_meta_bigg_mapping.pkl")
 
     # cache taxon info
-    taxids = [line[9] for line in line_generator(f_path) if line[9] and line[9] != "not available"]
+    taxids = [
+        line[9]
+        if (line[9] and line[9] != "not available")
+        else line[16]
+        if (line[16] and line[16] != "not available")
+        else None
+        for line in line_generator(f_path)
+    ]  #
+    taxids = [t for t in taxids if t]
     print(f"Total unique taxids: {len(set(taxids))}")
     taxon_info_q = get_taxon_info(taxids)
     taxon_info = {t["query"]: t for t in taxon_info_q if "notfound" not in t.keys()}
@@ -504,7 +549,7 @@ def cache_data(
     taxid_mapping = load_merged_from_tar(gzip_path)
     new_taxid_map = get_current_taxid(notfound, taxid_mapping)
     print(f"NCBI mapped taxids: {len(new_taxid_map)}")
-    new_taxids = sorted(set([new for old, new in new_taxid_map.items()]))
+    new_taxids = [new for old, new in new_taxid_map.items()]
     print(f"taxids need to be queried: {len(new_taxids)}")
     new_taxon_q = {t["query"]: t for t in get_taxon_info(new_taxids) if "notfound" not in t}
     new_taxon_info = {
@@ -534,64 +579,87 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
     """
     if not os.path.exists(Path(os.path.join("cache", "gmmad2_micro_meta_taxon_info_w_descr.pkl"))):
         print("Taxon info not found in cache, running cache_data()...")
-        cache_data(f_path)
+        cache_data(file_path)
 
+    # load cached data
     taxon_info = load_pickle("gmmad2_micro_meta_taxon_info_w_descr.pkl")
     pubchem_descr = load_pickle("gmmad2_micro_meta_description.pkl")
     pubchem_mw = load_pickle("gmmad2_micro_meta_pubchem_mw.pkl")
+    bigg_mapping = load_pickle("gmmad2_micro_meta_bigg_mapping.pkl")
 
     for line in line_generator(file_path):
         # create object node (metabolites)
         object_node = {
             "id": None,
-            "name": line[5].lower(),
+            "name": line[5].lower() if line[5] else line[4].lower(),
+            "synonym": pubchem_descr.get(line[6], {}).get("synonyms", []),
+            "description": pubchem_descr.get(line[6], {}).get("description", ""),
+            "chemical_formula": line[7] if line[7] else None,
+            "molecular_weight": pubchem_mw.get(line[6], {}).get("molecular_weight", {}),
+            "xlogp": pubchem_mw.get(line[6], {}).get("xlogp", None),
             "type": "biolink:SmallMolecule",
+            "xrefs": {},
         }
 
-        assign_col_val_if_available(object_node, "pubchem_cid", line[6], int)
-        assign_col_val_if_available(object_node, "chemical_formula", line[7])
-        assign_col_val_if_available(object_node, "smiles", line[18])
-
-        if "pubchem_cid" in object_node:
-            assign_to_xrefs_if_available(object_node, "kegg_compound", line[8])
-        else:
-            assign_col_val_if_available(object_node, "kegg_compound", line[8])
-        if "pubchem_cid" not in object_node and "kegg_compound" not in object_node:
-            assign_col_val_if_available(object_node, "hmdb", line[19])
-        else:
-            assign_to_xrefs_if_available(object_node, "hmdb", line[19])
-
-        if "pubchem_cid" in object_node:
-            object_node["id"] = f"PUBCHEM.COMPOUND:{object_node['pubchem_cid']}"
-        elif "kegg_compound" in object_node:
-            object_node["id"] = f"KEGG.COMPOUND:{object_node['kegg_compound']}"
-        elif "hmdb" in object_node:
-            object_node["id"] = f"HMDB:{object_node['hmdb']}"
-        else:
-            object_node["id"] = str(uuid.uuid4())
+        primary_id, xrefs = get_primary_id(line, bigg_mapping)
+        object_node["id"] = primary_id if primary_id else str(uuid.uuid4())
+        object_node["xrefs"] = xrefs
+        object_node = remove_empty_none_values(object_node)
 
         # create subject node (microbes)
-        subject_node = {"id": None, "name": line[2].lower(), "type": "biolink:OrganismalEntity"}
-
-        assign_col_val_if_available(subject_node, "taxid", line[9], int)
-        if "taxid" in subject_node:
-            subject_node["id"] = f"taxid:{subject_node['taxid']}"
+        taxid = (
+            line[9] if line[9] and line[9] != "not available"
+            else line[16] if line[16] and line[16] != "not available"
+            else None
+        )
+        if taxid  and taxid in taxon_info:
+            subject_node = {
+                "id": f"NCBITaxon:{taxon_info[taxid].get('_id')}",
+                "taxid": int(taxon_info[taxid].get("_id")),
+                "name": taxon_info[taxid].get("scientific_name").lower(),
+                "original_name": line[2].lower(),
+                "description": taxon_info[taxid].get("description"),
+                "parent_taxid": taxon_info[taxid].get("parent_taxid"),
+                "lineage": taxon_info[taxid].get("lineage", []),
+                "rank": taxon_info[taxid].get("rank"),
+                "type": "biolink:OrganismTaxon",
+                "organism_type": None,
+                "xrefs": taxon_info[taxid].get("xrefs", {}),
+            }
+            subject_node["organism_type"] = get_organism_type(subject_node)
+            subject_node = remove_empty_none_values(subject_node)
         else:
-            subject_node["id"] = str(uuid.uuid4())
+            subject_node = {
+                "id": str(uuid.uuid4()),
+                "original_name": line[2].lower(),
+                "type": "biolink:OrganismTaxon",
+            }
 
-        if subject_node.get("taxid") in taxon_info:
-            subject_node["scientific_name"] = taxon_info[subject_node["taxid"]]["scientific_name"]
-            subject_node["parent_taxid"] = taxon_info[subject_node["taxid"]]["parent_taxid"]
-            subject_node["lineage"] = taxon_info[subject_node["taxid"]]["lineage"]
-            subject_node["rank"] = taxon_info[subject_node["taxid"]]["rank"]
-
-        # association node has the reference and source of metabolites
-        association_node = {
-            "predicate": "biolink:associated_with",
-            "infores": line[17],
+        # association node has the habitat and source of the interaction
+        evidence_map = {
+            "infores:wom": "ECO:0001230",  # mass spec + manual
+            "infores:vmh": "ECO:0000218",  # manual assertion
+            "infores:gutMGene": "ECO:0000218",  # manual assertion
+            "infores:Metabolomics": "ECO:0001230",  # mass spec + manual
         }
-        if line[20] and line[20] != "Unknown":
-            association_node["sources"] = [src.strip().lower() for src in line[20].split(";")]
+
+        src = f"infores:{line[17].strip()}"
+        habitat = (
+            [h.strip().lower() for h in line[20].split(";")]
+            if line[20] and line[20] != "Unknown"
+            else None
+        )
+
+        association_node = {
+            "predicate": "biolink:OrganismTaxonToChemicalEntityAssociation",
+            "type": "has_metabolic_interaction_with",
+            "association_habitat": habitat,
+            "primary_knowledge_source": src,
+            "aggregator_knowledge_source": "infores:GMMAD2",
+            "evidence_type": evidence_map.get(src, "ECO:0000000"),
+        }
+
+        association_node = remove_empty_none_values(association_node)
 
         output_dict = {
             "_id": None,
@@ -636,6 +704,7 @@ def load_micro_meta_data(f_path) -> Iterator[dict]:
 
 if __name__ == "__main__":
     file_path = os.path.join("downloads", "micro_metabolic.csv")
+    cache_data(file_path)
 
 # micro_meta_data = load_micro_meta_data()
 # type_list = [obj["subject"]["type"] for obj in micro_meta_data]
