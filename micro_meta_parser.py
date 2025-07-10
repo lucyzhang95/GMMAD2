@@ -131,7 +131,7 @@ def get_taxon_info(taxids: list) -> list:
     :param taxids:
     :return: A list of dictionaries containing taxonomic information.
     """
-    taxids = set(taxids)
+    taxids = sorted(set(taxids))
     t = bt.get_client("taxon")
     taxon_info = t.gettaxa(taxids, fields=["scientific_name", "parent_taxid", "lineage", "rank"])
     return taxon_info
@@ -203,7 +203,7 @@ async def get_batch_pubchem_descriptions_async(
     workers = min(workers, 5)
     sem = asyncio.Semaphore(workers)
     connector = aiohttp.TCPConnector(limit_per_host=workers)
-    cids = list(set(cids))
+    cids = sorted(list(set(cids)))
 
     results = {}
     async with aiohttp.ClientSession(connector=connector) as session:
@@ -465,11 +465,45 @@ def add_description2taxon_info(taxon_info: dict, descriptions: dict) -> dict:
     return taxon_info
 
 
-def cache_data(f_path):
+def cache_data(f_path, gzip_path):
     # cache metabolite descriptions
-    pubchem_cids = [line[6] for line in line_generator(f_path) if line[6] and line[6] != "not available"]
+    pubchem_cids = [
+        line[6] for line in line_generator(f_path) if line[6] and line[6] != "not available"
+    ]
+    print(f"Total unique pubchem_cids: {len(pubchem_cids)}")
     pubchem_descr = get_pubchem_descriptions(pubchem_cids)
-    
+    print(f"Total pubchem_cid with descriptions: {len(pubchem_descr)}")
+    save_pickle(pubchem_descr, "gmmad2_micro_meta_description.pkl")
+
+    # cache taxon info
+    taxids = [line[9] for line in line_generator(f_path) if line[9] and line[9] != "not available"]
+    print(f"Total unique taxids: {len(taxids)}")
+    taxon_info_q = get_taxon_info(taxids)
+    taxon_info = {t["query"]: t for t in taxon_info_q if "notfound" not in t.keys()}
+    print(f"Biothings mapped {len(taxon_info)} taxids.")
+    notfound = sorted(set([t["query"] for t in taxon_info_q if "notfound" in t.keys()]))
+    print(f"Not found taxids: {len(notfound)}")
+    taxid_mapping = load_merged_from_tar(gzip_path)
+    new_taxid_map = get_current_taxid(notfound, taxid_mapping)
+    print(f"NCBI mapped taxids: {len(new_taxid_map)}")
+    new_taxids = sorted(set([new for old, new in new_taxid_map.items()]))
+    print(f"taxids need to be queried: {len(new_taxids)}")
+    new_taxon_q = {t["query"]: t for t in get_taxon_info(new_taxids) if "notfound" not in t}
+    new_taxon_info = {
+        old: new_taxon_q[new] for old, new in new_taxid_map.items() if new in new_taxon_q
+    }
+    print(f"Biothings mapped new taxids: {len(new_taxon_info)}")
+    taxon_info.update(new_taxon_info)
+    print(f"Merged taxon info: {len(taxon_info)}")
+    save_pickle(taxon_info, "gmmad2_micro_meta_taxon_info.pkl")
+
+    # cache taxon descriptions from NCIT
+    taxon_names = get_taxon_names(taxon_info)
+    print(f"Total unique taxon names: {len(taxon_names)}")
+    ncit_descriptions = get_ncit_taxon_description(taxon_names)
+    print(f"NCIT descriptions found for {len(ncit_descriptions)} taxon names.")
+    taxon_info_w_descr = add_description2taxon_info(taxon_info, ncit_descriptions)
+    save_pickle(taxon_info_w_descr, "gmmad2_microbe_disease_taxon_info_w_descr.pkl")
 
 
 def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
