@@ -114,13 +114,24 @@ def get_taxon_info(taxids: list) -> list:
     return taxon_info
 
 
-def load_merged_from_tar(tar_gz_path, f_name="merged.dmp"):
+def ensure_ncbi_taxdump(tar_gz_path: str | Path) -> Path:
+    tar_gz_path = Path(tar_gz_path)
+    if tar_gz_path.exists():
+        print(f"NCBI taxdump found at {tar_gz_path}, using existing file.")
+        return tar_gz_path
+
+    print("NCBI taxdump not found – downloading via ETE3 …")
+    ncbi = NCBITaxa()
+    ncbi.update_taxonomy_database()
+    return tar_gz_path
+
+
+def load_merged_from_tar(tar_gz_path=None, f_name="merged.dmp"):
     """Parse 'merged.dmp' of taxdump.tar.gz downloaded by ete3.
     Returns a dict {old_taxid: new_taxid}.
     """
-    if not os.path.exists(tar_gz_path):
-        ncbi = NCBITaxa()
-        ncbi.update_taxonomy_database()
+    if tar_gz_path is None:
+        tar_gz_path = ensure_ncbi_taxdump(tar_gz_path)
 
     taxid_mapping = {}
     with tarfile.open(tar_gz_path, "r:gz") as tar:
@@ -136,7 +147,7 @@ def load_merged_from_tar(tar_gz_path, f_name="merged.dmp"):
 def get_current_taxid(old_taxids: list, merged_mapping: dict) -> dict[str, str]:
     taxid_mapping = {}
     for old_taxid in old_taxids:
-        taxid_mapping[old_taxid] = merged_mapping[old_taxid]
+        taxid_mapping[old_taxid] = merged_mapping.get(old_taxid)
     return taxid_mapping
 
 
@@ -272,7 +283,7 @@ def remove_empty_none_values(obj):
 
 def cache_data(f_path, gzip_path=None):
     if gzip_path is None:
-        gzip_path = os.path.join("downloads", "taxdump.tar.gz")
+        gzip_path = ensure_ncbi_taxdump(gzip_path)
     # cache all taxon info including lineage, rank, parent_taxid from disease_species.csv
     taxids = sorted(set([line[5] for line in line_generator_4_midi(f_path)]))
     print(f"Total unique taxids: {len(taxids)}")
@@ -307,7 +318,7 @@ def cache_data(f_path, gzip_path=None):
 def get_node_info(f_path: str | os.PathLike) -> Iterator[dict]:
     """generates node dictionaries and parse through the disease_species.csv file
     This function reads data, processes taxonomic information,
-    and generates subject, object and association nodes,
+    and generates subject, object, and association nodes,
     representing diseases and microbes, as well as their relationships.
 
     :param f_path: Path to the disease_species.csv file
@@ -369,7 +380,7 @@ def get_node_info(f_path: str | os.PathLike) -> Iterator[dict]:
             "healthy_abundance_sd": float(line[15]),
             "primary_knowledge_source": "infores:GMrepo",
             "aggregator_knowledge_source": "infores:GMMAD2",
-            "evidence_type": "ECO:0000221"  # high throughput nucleotide sequencing assay evidence
+            "evidence_type": "ECO:0000221",  # high throughput nucleotide sequencing assay evidence
         }
         association_node = remove_empty_none_values(association_node)
 
