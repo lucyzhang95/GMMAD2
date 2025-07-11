@@ -7,13 +7,10 @@ import time
 import uuid
 from collections import Counter
 from collections.abc import Iterator
-from pathlib import Path
 from typing import Dict, List
 
 import aiohttp
 import biothings_client as bt
-import pandas as pd
-import requests
 from dotenv import load_dotenv
 from tqdm.asyncio import tqdm_asyncio
 
@@ -41,7 +38,7 @@ from tqdm.asyncio import tqdm_asyncio
  19: 'score',   # 'Not available' or '0.95'
  20: 'alteration',  # 'Unknown' or ['elevated', 'reduced', 'target', 'Inhibitor', 'Activator']
  21: 'PMID',   # 'Not available' or '31142855'
- 22: 'source'   # 'stitch, drugbank'
+ 22: 'source'   # ['stitch', 'gutMGene', 'stitch, gutMGene', 'stitch, drugbank', 'drugbank']
 }
 """
 
@@ -458,7 +455,7 @@ def cache_data(in_f):
     pubchem_mw_logp = bt_get_mw_logp(pubchem_cids)
     print(f"Total pubchem_cid with molecular weight and xlogp: {len(pubchem_mw_logp)}")
     save_pickle(pubchem_mw_logp, "gmmad2_meta_gene_pubchem_mw.pkl")
-    
+
     # cache gene/protein information
     gene_ids = [
         line[16]
@@ -475,7 +472,7 @@ def cache_data(in_f):
     prot_info = get_protein_info(uniprot_ids)
     gene_ids = [_id for _id in uniprot_ids if "ENSG" in _id]
     print(f"Total unique gene_ids: {len(set(gene_ids))}")
-    gene_info = get_gene_info(gene_ids)
+    gene_info = get_gene_name(gene_ids)
     full_gene_info = prot_info | gene_info
     print(f"Total unique gene/protein info: {len(full_gene_info)}")
     save_pickle(full_gene_info, "gmmad2_meta_gene_uniprot_ensemble_info.pkl")
@@ -498,7 +495,7 @@ def remove_empty_none_values(obj):
                 cleaned_list.append(v_clean)
         return cleaned_list
     return obj
-    
+
 
 def get_suffix(identifier: str) -> str:
     return identifier.split(":", 1)[1].strip() if ":" in identifier else identifier.strip()
@@ -511,38 +508,110 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
     :param file_path: path to meta_gene_net.csv file
     :return: An iterator of dictionaries containing node information.
     """
+    if not os.path.exists(os.path.join(CACHE_DIR, "gmmad2_meta_gene_description.pkl")):
+        cache_data(file_path)
+
+    # load cached data
+    pubchem_descr = load_pickle("gmmad2_meta_gene_description.pkl")
+    pubchem_mw = load_pickle("gmmad2_meta_gene_pubchem_mw.pkl")
+    gene_info = load_pickle("gmmad2_meta_gene_uniprot_ensemble_info.pkl")
+    bigg_mapping = load_pickle("gmmad2_micro_meta_bigg_mapping.pkl")
+
     for line in line_generator(file_path):
-        # create object node (genes)
-        object_node = {"id": None, "symbol": line[12], "type": "biolink:Gene"}
-        
-        # create subject node (metabolites)
+        uniprot_id = line[16] if line[16] and line[16] != "Not available" else None
+        ensemble = line[13] if line[13] and line[13] != "Not available" else None
+
+        # object node (genes/proteins)
+        object_node = {
+            "id": f"UniProtKB:{uniprot_id}" if uniprot_id else f"ENSEMBL:{ensemble}",
+            "name": gene_info.get(uniprot_id)["name"]
+            if uniprot_id in gene_info
+            else gene_info.get(ensemble)["name"],
+            "full_name": gene_info.get(uniprot_id)["full_name"]
+            if uniprot_id in gene_info
+            else gene_info.get(ensemble)["full_name"],
+            "original_name": line[12],
+            "description": line[18]
+            if line[18] and line[18] != "Not available"
+            else gene_info.get(uniprot_id)["description"],
+            "residue_num": int(line[17]) if line[17] else None,
+            "type": "biolink:Protein",
+            "xrefs": {},
+        }
+        _, gene_xrefs = get_primary_gene_id(line)
+        object_node["xrefs"] = gene_xrefs
+        object_node = remove_empty_none_values(object_node)
+
+        # subject node (metabolites)
         subject_node = {
             "id": None,
             "name": line[2].lower(),
+            "synonym": pubchem_descr.get(line[3], {}).get("synonyms", []),
+            "description": pubchem_descr.get(line[3], {}).get("description", ""),
+            "chemical_formula": line[4] if line[4] and line[4] != "not available" else None,
+            "molecular_weight": pubchem_mw.get(line[3], {}).get("molecular_weight", {}),
+            "xlogp": pubchem_mw.get(line[3], {}).get("xlogp", None),
             "type": "biolink:SmallMolecule",
+            "xrefs": {},
         }
+        chem_id_xrefs = get_primary_chem_id(line, bigg_mapping)
+        if chem_id_xrefs:
+            chem_primary_id, chem_xrefs = chem_id_xrefs
+        else:
+            chem_primary_id, chem_xrefs = None, {}
+        subject_node["id"] = chem_primary_id if chem_primary_id else str(uuid.uuid4())
+        subject_node["xrefs"] = chem_xrefs
+        subject_node = remove_empty_none_values(subject_node)
 
         # association node
-        association_node = {"predicate": "biolink:associated_with"}
+        habitat = (
+            [h.strip().lower() for h in line[9].split(";")]
+            if line[9] and line[9] != "Unknown"
+            else None
+        )
+        srcs = (
+            [f"infores:{src.strip()}" for src in line[22].split(",")]
+            if "," in line[22]
+            else f"infores:{line[22].lower().strip()}"
+        )
+        evidence_map = {
+            "infores:stitch": "ECO:0007669",  # computational evidence used in automatic assertion
+            "infores:drugbank": "ECO:0000269",  # experimental evidence used in manual assertion
+            "infores:gutMGene": "ECO:0000218",  # manual assertion
+        }
+        if isinstance(srcs, list):
+            ecos = [evidence_map.get(s, "ECO:0000000") for s in srcs]
+            evidence_type = ecos if len(ecos) > 1 else ecos[0]
+        elif isinstance(srcs, str):
+            evidence_type = evidence_map.get(srcs, "ECO:0000000")
+        else:
+            evidence_type = "ECO:0000000"
 
-        if line[9] and line[9] != "Unknown":
-            association_node["sources"] = [src.strip().lower() for src in line[9].split(";")]
-        if line[22] and line[22] != "Unknown":
-            association_node["infores"] = [src.strip().lower() for src in line[22].split(",")]
-        if line[20] and line[20] != "Unknown":
-            association_node["qualifier"] = line[20].lower()
-        if "elevated" in association_node.get("qualifier", ""):
-            association_node["qualifier"] = association_node["qualifier"].replace(
-                "elevated", "increased"
-            )
-            association_node["category"] = "biolink:ChemicalAffectsGeneAssociation"
-        if "reduced" in association_node.get("qualifier", ""):
-            association_node["qualifier"] = association_node["qualifier"].replace(
-                "reduced", "decreased"
-            )
-            association_node["category"] = "biolink:ChemicalAffectsGeneAssociation"
+        association_node = {
+            "id": "RO:0002434",
+            "predicate": "biolink:ChemicalGeneInteractionAssociation",
+            "type": "interacts_with",
+            "association_habitat": habitat,
+            "score": float(line[19]) if line[19] and line[19] != "Not available" else None,
+            "qualifier": (
+                "decrease"
+                if line[20] and "reduced" in line[20].lower()
+                else "increase"
+                if line[20] and "elevated" in line[20].lower()
+                else line[20].lower()
+                if line[20]
+                else None
+            ),
+            "primary_knowledge_source": srcs,
+            "aggregator_knowledge_source": "infores:gmmad2",
+            "evidence_type": evidence_type,
+            "publications": {
+                "pmid": line[21] if line[21] and line[21] != "Not available" else None,
+                "type": "biolink:Publication",
+            },
+        }
+        association_node = remove_empty_none_values(association_node)
 
-        # combine all the nodes
         output_dict = {
             "_id": None,
             "association": association_node,
@@ -550,18 +619,14 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
             "subject": subject_node,
         }
 
-        if ":" in object_node["id"] and ":" in subject_node["id"]:
-            output_dict[
-                "_id"
-            ] = f"{subject_node['id'].split(':')[1].strip()}_associated_with_{object_node['id'].split(':')[1].strip()}"
-        else:
-            output_dict[
-                "_id"
-            ] = f"{subject_node['id']}_associated_with_{object_node['id'].split(':')[1].strip()}"
+        subject_suffix = get_suffix(subject_node["id"])
+        object_suffix = get_suffix(object_node["id"])
+        output_dict["_id"] = f"{subject_suffix}_interacts_with_{object_suffix}"
+
         yield output_dict
 
 
-def load_meta_gene_data() -> Iterator[dict]:
+def load_meta_gene_data(f_path) -> Iterator[dict]:
     """loads and yields unique meta gene data records from meta_gene_net.csv file.
 
     This function constructs the file path to meta_gene_net.csv file,
@@ -570,23 +635,26 @@ def load_meta_gene_data() -> Iterator[dict]:
 
     :return: An iterator of unique dictionaries containing meta gene data.
     """
-    path = os.getcwd()
-    file_path = os.path.join(path, "data", "meta_gene_net.csv")
-    assert os.path.exists(file_path), f"The file {file_path} does not exist."
-
-    dup_ids = set()
-    recs = get_node_info(file_path)
+    assert os.path.exists(f_path), f"The file {f_path} does not exist."
+    recs = get_node_info(f_path)
     for rec in recs:
-        if rec["_id"] not in dup_ids:
-            dup_ids.add(rec["_id"])
-            yield rec
+        yield rec
+
+    # dup_ids = set()
+    # for rec in recs:
+    #     if rec["_id"] not in dup_ids:
+    #         dup_ids.add(rec["_id"])
+    #         yield rec
 
 
-# if __name__ == "__main__":
-#     _ids = []
-#     meta_gene_data = load_meta_gene_data()
-#     for obj in meta_gene_data:
-#         print(obj)
-#         _ids.append(obj["_id"])
-#     print(f"total records: {len(_ids)}")
-#     print(f"total records without duplicates: {len(set(_ids))}")
+if __name__ == "__main__":
+    file_path = os.path.join("downloads", "meta_gene_net.csv")
+    # cache_data(file_path)
+
+    # meta_gene_data = [line for line in load_meta_gene_data(file_path)]
+    # _ids = []
+    # for obj in meta_gene_data:
+    #     print(obj)
+    #     _ids.append(obj["_id"])
+    # print(f"total records: {len(_ids)}")
+    # print(f"total records without duplicates: {len(set(_ids))}")
