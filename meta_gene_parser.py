@@ -95,7 +95,7 @@ def line_generator(in_file: str | os.PathLike, delimiter=",", skip_header=True) 
 def get_gene_name(gene_ids: list) -> list:
     """
     Retrieves gene names for a given list of gene IDs using biothings_client
-    The IDs are searched across multiple scopes: "entrezgene", "ensembl.gene", and "uniprot".
+    The IDs are searched across multiple scopes: "ensembl.gene" and "uniprot".
 
     :param gene_ids: A list of gene IDs to be queried.
     :type gene_ids: List
@@ -104,7 +104,7 @@ def get_gene_name(gene_ids: list) -> list:
     gene_ids = set(gene_ids)
     t = bt.get_client("gene")
     gene_names = t.querymany(
-        gene_ids, scopes=["entrezgene", "ensembl.gene", "uniprot"], fields=["name"]
+        gene_ids, scopes=["uniprot", "ensembl.gene"], fields=["name"]
     )
     return gene_names
 
