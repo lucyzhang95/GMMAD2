@@ -103,10 +103,61 @@ def get_gene_name(gene_ids: list) -> list:
     """
     gene_ids = set(gene_ids)
     t = bt.get_client("gene")
-    gene_names = t.querymany(
-        gene_ids, scopes=["ensembl.gene"], fields=["name"]
-    )
+    gene_q = t.querymany(gene_ids, scopes=["ensembl.gene"], fields=["name", "symbol"])
+    gene_names = {
+        d["query"]: {"name": d["symbol"], "full_name": d["name"]}
+        for d in gene_q
+        if "notfound" not in d
+    }
     return gene_names
+
+
+async def get_protein_info_async(session, uniprot_id):
+    url = f"https://rest.uniprot.org/uniprotkb/{uniprot_id}.json"
+    try:
+        async with session.get(url) as response:
+            if response.status != 200:
+                return None
+
+            data = await response.json()
+
+            prot_desc = data.get("proteinDescription", {})
+            rec_name = prot_desc.get("recommendedName", {})
+            full_name = rec_name.get("fullName", {})
+            name = full_name.get("value", "Name not found")
+
+            func = None
+            for comment in data.get("comments", []):
+                if comment.get("commentType") == "FUNCTION":
+                    texts = comment.get("texts", [])
+                    if texts and texts[0].get("value"):
+                        func = texts[0]["value"]
+                        break
+
+            return {uniprot_id: {"name": name, "description": func}}
+
+    except Exception as e:
+        print(f"{uniprot_id} has an error: {e}")
+
+
+async def get_batch_protein_info(uniprot_ids: List[str], batch_size=5, delay=1.0):
+    results = {}
+    unique_ids = list(set(uniprot_ids))
+    connector = aiohttp.TCPConnector(limit=batch_size)
+    async with aiohttp.ClientSession(connector=connector) as session:
+        for i in range(0, len(unique_ids), batch_size):
+            batch = unique_ids[i : i + batch_size]
+            tasks = [get_protein_info_async(session, uid) for uid in batch]
+            batch_results = await asyncio.gather(*tasks)
+            for entry in batch_results:
+                if entry:
+                    results.update(entry)
+            await asyncio.sleep(delay)
+    return results
+
+
+def get_protein_info(uniprot_ids: List[str], batch_size=5, delay=1.0) -> Dict[str, Dict[str, str]]:
+    return asyncio.run(get_batch_protein_info(uniprot_ids, batch_size, delay))
 
 
 def get_bigg_metabolite_mapping(in_f):
@@ -384,8 +435,10 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
 
     # get gene ids
     gene_ids = [
-        line[16] if line[16] and line[16] != "Not available"
-        else line[13] if line[13] and line[13] != "Not available"
+        line[16]
+        if line[16] and line[16] != "Not available"
+        else line[13]
+        if line[13] and line[13] != "Not available"
         else None
         for line in line_generator(file_path)
     ]
