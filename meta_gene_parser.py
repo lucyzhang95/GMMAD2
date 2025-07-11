@@ -470,9 +470,9 @@ def cache_data(in_f):
     uniprot_ids = [_id for _id in gene_ids if "ENSG" not in _id]
     print(f"Total unique uniprot_ids: {len(set(uniprot_ids))}")
     prot_info = get_protein_info(uniprot_ids)
-    gene_ids = [_id for _id in uniprot_ids if "ENSG" in _id]
+    ensembl_gene_ids = [_id for _id in gene_ids if "ENSG" in _id]
     print(f"Total unique gene_ids: {len(set(gene_ids))}")
-    gene_info = get_gene_name(gene_ids)
+    gene_info = get_gene_name(ensembl_gene_ids )
     full_gene_info = prot_info | gene_info
     print(f"Total unique gene/protein info: {len(full_gene_info)}")
     save_pickle(full_gene_info, "gmmad2_meta_gene_uniprot_ensemble_info.pkl")
@@ -525,7 +525,7 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
         object_node = {
             "id": f"UniProtKB:{uniprot_id}" if uniprot_id else f"ENSEMBL:{ensemble}",
             "name": gene_info.get(uniprot_id)["name"]
-            if uniprot_id in gene_info
+            if uniprot_id != "Not available"
             else gene_info.get(ensemble)["name"],
             "full_name": gene_info.get(uniprot_id)["full_name"]
             if uniprot_id in gene_info
@@ -649,12 +649,12 @@ def load_meta_gene_data(f_path) -> Iterator[dict]:
 
 if __name__ == "__main__":
     file_path = os.path.join("downloads", "meta_gene_net.csv")
-    # cache_data(file_path)
+    cache_data(file_path)
 
-    # meta_gene_data = [line for line in load_meta_gene_data(file_path)]
-    # _ids = []
-    # for obj in meta_gene_data:
-    #     print(obj)
-    #     _ids.append(obj["_id"])
-    # print(f"total records: {len(_ids)}")
-    # print(f"total records without duplicates: {len(set(_ids))}")
+    meta_gene_data = [line for line in load_meta_gene_data(file_path)]
+    _ids = []
+    for obj in meta_gene_data:
+        print(obj)
+        _ids.append(obj["_id"])
+    print(f"total records: {len(_ids)}")
+    print(f"total records without duplicates: {len(set(_ids))}")
