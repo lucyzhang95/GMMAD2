@@ -9,6 +9,7 @@ from typing import Dict, Iterator, List
 
 import aiohttp
 import biothings_client as bt
+from Bio import Entrez
 from dotenv import load_dotenv
 from tqdm.asyncio import tqdm_asyncio
 
@@ -439,6 +440,46 @@ def bt_get_mw_logp(cids: list):
     return q_out
 
 
+def get_pubmed_metadata(pmids):
+    """Get title, DOI, and abstract for a list of pmids using Entrez.
+
+    :param pmids: a list of pmids obtained from core_table.txt
+    :return: a dictionary with pmid as key and a dictionary with title, abstract, and doi as value.
+    """
+    pmids = set(pmids)
+    handle = Entrez.efetch(db="pubmed", id=",".join(map(str, pmids)), retmode="xml")
+    records = Entrez.read(handle)
+    handle.close()
+
+    result = {}
+    for article in records["PubmedArticle"]:
+        try:
+            pmid = str(article["MedlineCitation"]["PMID"])
+            article_data = article["MedlineCitation"]["Article"]
+
+            title = article_data.get("ArticleTitle", "")
+            abstract = ""
+            if "Abstract" in article_data:
+                abstract_parts = article_data["Abstract"].get("AbstractText", [])
+                abstract = " ".join(str(part) for part in abstract_parts)
+
+            doi = ""
+            elist = article.get("PubmedData", {}).get("ArticleIdList", [])
+            for el in elist:
+                if el.attributes.get("IdType") == "doi":
+                    doi = str(el)
+                    break
+
+            result[pmid] = {
+                "name": title,
+                "summary": f"{abstract} [abstract]",
+                "doi": doi,
+            }
+        except Exception as e:
+            print(f"Failed to parse article: {e}")
+    return result
+
+
 def cache_data(in_f):
     # cache pubchem descriptions
     pubchem_cids = [
@@ -474,6 +515,14 @@ def cache_data(in_f):
     full_gene_info = prot_info | gene_info
     print(f"Total unique gene/protein info: {len(full_gene_info)}")
     save_pickle(full_gene_info, "gmmad2_meta_gene_uniprot_ensemble_info.pkl")
+
+    # cache pmid metadata
+    pmids = [
+        line[21] for line in line_generator(file_path) if line[21] and line[21] != "Not available"
+    ]
+    print(f"Total unique pmids: {len(set(pmids))}")
+    pmid_metadata = get_pubmed_metadata(pmids)
+    save_pickle(pmid_metadata, "gmmad2_meta_gene_pmid_metadata.pkl")
 
 
 def remove_empty_none_values(obj):
@@ -514,6 +563,7 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
     pubchem_mw = load_pickle("gmmad2_meta_gene_pubchem_mw.pkl")
     gene_info = load_pickle("gmmad2_meta_gene_uniprot_ensemble_info.pkl")
     bigg_mapping = load_pickle("gmmad2_micro_meta_bigg_mapping.pkl")
+    pmid_metadata = load_pickle("gmmad2_micro_meta_pmid_metadata.pkl")
 
     for line in line_generator(file_path):
         uniprot_id = line[16] if line[16] and line[16] != "Not available" else None
@@ -604,8 +654,11 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
             "aggregator_knowledge_source": "infores:gmmad2",
             "evidence_type": evidence_type,
             "publications": {
-                "pmid": line[21] if line[21] and line[21] != "Not available" else None,
+                "pmid": int(line[21]) if line[21] and line[21] != "Not available" else None,
                 "type": "biolink:Publication",
+                "summary": pmid_metadata.get(line[21]).get("summary", None),
+                "name": pmid_metadata.get(line[21]).get("name", None),
+                "doi": pmid_metadata.get(line[21]).get("doi", None),
             },
         }
         association_node = remove_empty_none_values(association_node)
