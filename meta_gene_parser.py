@@ -481,6 +481,29 @@ def cache_data(in_f):
     save_pickle(full_gene_info, "gmmad2_meta_gene_uniprot_ensemble_info.pkl")
 
 
+def remove_empty_none_values(obj):
+    if isinstance(obj, dict):
+        cleaned = {}
+        for k, v in obj.items():
+            v_clean = remove_empty_none_values(v)
+            if v_clean not in (None, {}, []):
+                cleaned[k] = v_clean
+        return cleaned
+
+    if isinstance(obj, list):
+        cleaned_list = []
+        for v in obj:
+            v_clean = remove_empty_none_values(v)
+            if v_clean not in (None, {}, []):
+                cleaned_list.append(v_clean)
+        return cleaned_list
+    return obj
+    
+
+def get_suffix(identifier: str) -> str:
+    return identifier.split(":", 1)[1].strip() if ":" in identifier else identifier.strip()
+
+
 def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
     """generates node dictionaries from meta_gene_net.csv file
     This function reads gene and metabolite data and processes it.
