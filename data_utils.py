@@ -5,7 +5,7 @@ from typing import Dict, Iterator, List
 import pandas as pd
 
 
-def line_generator(in_file: str | os.PathLike, delimiter=",", skip_header=True) -> Iterator[list]:
+def line_generator(in_file: str | os.PathLike, delimiter=",", skip_header=False) -> Iterator[list]:
     with open(in_file, "r") as in_f:
         reader = csv.reader(in_f, delimiter=delimiter)
         if skip_header:
