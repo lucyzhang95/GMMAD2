@@ -31,7 +31,7 @@ from tqdm.asyncio import tqdm_asyncio
  9: 'Origin',   # 'Unknown' or 'Microbiota; Food related; Drug related'
  10: 'smiles_sequence', # 'not available' or 'C1C=CN(C=C1C(=O)N)C2C(C(C(O2)COP(=O)(O)OP(=O)(O)OCC3C(C(C(O3)N4C=NC5=C(N=CN=C54)N)O)O)O)O'
  11: 'gene_id', # 'g5070'
- 12: 'gene',    # 'NSDHL'
+ 12: 'gene',    # 'NSDHL' -> as original_name: from GENECARD
  13: 'ensembl_id',  # 'Not available' or 'ENSG00000147383'
  14: 'NCBI',    # 'Not available' or '50814'
  15: 'HGNC',    # 'Not available' or '13398'
@@ -95,7 +95,7 @@ def line_generator(in_file: str | os.PathLike, delimiter=",", skip_header=True) 
 def get_gene_name(gene_ids: list) -> list:
     """
     Retrieves gene names for a given list of gene IDs using biothings_client
-    The IDs are searched across multiple scopes: "ensembl.gene" and "uniprot".
+    The IDs are searched across multiple scopes: "ensembl.gene".
 
     :param gene_ids: A list of gene IDs to be queried.
     :type gene_ids: List
@@ -104,7 +104,7 @@ def get_gene_name(gene_ids: list) -> list:
     gene_ids = set(gene_ids)
     t = bt.get_client("gene")
     gene_names = t.querymany(
-        gene_ids, scopes=["uniprot", "ensembl.gene"], fields=["name"]
+        gene_ids, scopes=["ensembl.gene"], fields=["name"]
     )
     return gene_names
 
@@ -382,21 +382,13 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
     :return: An iterator of dictionaries containing node information.
     """
 
-    # gather gene ids from the file
-    entrezgene_ids = [
-        line[14] for line in line_generator(file_path) if "not available" not in line[14]
-    ]
-    ensembl_ids = [
-        line[13]
+    # get gene ids
+    gene_ids = [
+        line[16] if line[16] and line[16] != "Not available"
+        else line[13] if line[13] and line[13] != "Not available"
+        else None
         for line in line_generator(file_path)
-        if "not available" in line[14] and "not available" not in line[13]
     ]
-    uniprot_ids = [
-        line[16]
-        for line in line_generator(file_path)
-        if "not available" in line[14] and "not available" in line[13]
-    ]
-    gene_ids = entrezgene_ids + ensembl_ids + uniprot_ids
 
     # get gene name using get_gene_name() function
     gene_name = {
