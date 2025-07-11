@@ -181,10 +181,10 @@ def get_primary_gene_id(line):
 
     # (line, prefix) pairs for ID hierarchy
     id_hierarchy = [
-        (ncbi_id, "NCBIGene"),
-        (ensembl_id, "ENSEMBL"),
-        (hgnc_id, "HGNC"),
         (uniprotkb, "UniProtKB"),
+        (ensembl_id, "ENSEMBL"),
+        (ncbi_id, "NCBIGene"),
+        (hgnc_id, "HGNC"),
     ]
 
     xrefs = {}
