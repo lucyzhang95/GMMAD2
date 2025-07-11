@@ -712,7 +712,7 @@ if __name__ == "__main__":
     meta_gene_data = [line for line in load_meta_gene_data(file_path)]
     _ids = []
     for obj in meta_gene_data:
-        print(obj)
+        # print(obj)
         _ids.append(obj["_id"])
     print(f"total records: {len(_ids)}")
     print(f"total records without duplicates: {len(set(_ids))}")
