@@ -1,9 +1,21 @@
+import asyncio
 import csv
+import json
 import os
+import pickle
+import time
 import uuid
+from collections import Counter
 from collections.abc import Iterator
+from pathlib import Path
+from typing import Dict, List
 
-import biothings_client
+import aiohttp
+import biothings_client as bt
+import pandas as pd
+import requests
+from dotenv import load_dotenv
+from tqdm.asyncio import tqdm_asyncio
 
 """
 {
@@ -19,12 +31,12 @@ import biothings_client
  9: 'Origin',   # 'Unknown' or 'Microbiota; Food related; Drug related'
  10: 'smiles_sequence', # 'not available' or 'C1C=CN(C=C1C(=O)N)C2C(C(C(O2)COP(=O)(O)OP(=O)(O)OCC3C(C(C(O3)N4C=NC5=C(N=CN=C54)N)O)O)O)O'
  11: 'gene_id', # 'g5070'
- 12: 'gene',    # 'Unknow' or 'NSDHL'
+ 12: 'gene',    # 'NSDHL'
  13: 'ensembl_id',  # 'Not available' or 'ENSG00000147383'
  14: 'NCBI',    # 'Not available' or '50814'
  15: 'HGNC',    # 'Not available' or '13398'
  16: 'UniProt', # 'Not available' or 'Q15738'
- 17: 'protein_size',    # 'Unknow' or '373'
+ 17: 'protein_size',    # '373'
  18: 'annonation',  # 'Not available' or 'The protein encoded by this gene is localized in the endoplasmic reticulum ...'
  19: 'score',   # 'Not available' or '0.95'
  20: 'alteration',  # 'Unknown' or ['elevated', 'reduced', 'target', 'Inhibitor', 'Activator']
@@ -33,60 +45,56 @@ import biothings_client
 }
 """
 
+load_dotenv()
+CACHE_DIR = os.path.join(os.getcwd(), "cache")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
-def line_generator(in_file: str | os.PathLike) -> Iterator[list]:
+
+def save_pickle(obj, f_name):
+    """
+    :param obj: data to be saved as a pickle file
+    :param f_name: files should only be existing in the cache directory
+    :return:
+    """
+    with open(os.path.join(CACHE_DIR, f_name), "wb") as out_f:
+        pickle.dump(obj, out_f)
+
+
+def load_pickle(f_name):
+    path = os.path.join(CACHE_DIR, f_name)
+    return (
+        pickle.load(open(path, "rb")) if os.path.exists(path) else print("The file does not exist.")
+    )
+
+
+def save_json(obj, f_name):
+    with open(os.path.join(CACHE_DIR, f_name), "w") as out_f:
+        json.dump(obj, out_f, indent=4)
+
+
+def line_generator(in_file: str | os.PathLike, delimiter=",", skip_header=True) -> Iterator[list]:
     """generates lines from a CSV file, yielding each line as a list of strings
     This function opens the specified CSV file, skips the header row, and yields each subsequent line as a list of strings.
 
+    :param skip_header:
     :param in_file: The path to the CSV file.
+    :param delimiter: The character used to separate values in the CSV file (default is comma).
     :return: An iterator that yields each line of the CSV file as a list of strings.
     """
-    with open(in_file) as in_f:
-        reader = csv.reader(in_f)
-        next(reader)
+    with open(in_file, "r") as in_f:
+        reader = csv.reader(in_f, delimiter=delimiter)
+        if skip_header:
+            next(reader)
+        else:
+            pass
+
         for line in reader:
             yield line
 
 
-def assign_col_val_if_available(node: dict, key: str, val: str | int | float, transform=None):
-    """assigns a value to a specified key in a dictionary if the value is available and not equal to "not available"
-    This function updates the given dictionary with the provided key and value.
-    It can also transform the value using a specified function before assigning it.
-
-    :param node: The dictionary to be updated.
-    :param key: The key to be assigned the value in the dictionary.
-    :param val: The value to be assigned to the key in the dictionary.
-    :param transform: An optional function to transform the value before assignment. If None, the value is assigned as is.
-    :return: None
-    """
-    if val and val != "not available":
-        node[key] = transform(val) if transform else val
-
-
-def assign_to_xrefs_if_available(node: dict, key: str, val: str | int | float, transform=None):
-    """assigns a value to the 'xrefs' sub-dictionary of a given dictionary
-    This function checks if the 'xrefs' key exists in the given dictionary.
-    If not, it initializes 'xrefs' as an empty dictionary.
-    Then, it assigns the provided value to the specified key within the 'xrefs' dictionary
-    It can also transform the value using a specified function.
-
-    :param node: The dictionary to be updated.
-    :param key: The key to be assigned the value in the 'xrefs' sub-dictionary.
-    :param val: The value to be assigned to the key in the 'xrefs' sub-dictionary.
-    :param transform: An optional function to transform the value before assignment. If None, the value is assigned as is.
-    :return: None
-    """
-    if val and val != "not available":
-        if "xrefs" not in node:
-            node["xrefs"] = {}
-
-        node["xrefs"][key] = transform(val) if transform else val
-
-
 def get_gene_name(gene_ids: list) -> list:
-    """retrieves gene names for a given list of gene IDs using biothings_client
-    This function takes a list of gene IDs, removes any duplicates by converting the list to a set
-    Queries a gene database client for the gene names associated with these IDs.
+    """
+    Retrieves gene names for a given list of gene IDs using biothings_client
     The IDs are searched across multiple scopes: "entrezgene", "ensembl.gene", and "uniprot".
 
     :param gene_ids: A list of gene IDs to be queried.
@@ -94,17 +102,207 @@ def get_gene_name(gene_ids: list) -> list:
     :return: A list of dictionaries containing the gene names and associated information.
     """
     gene_ids = set(gene_ids)
-    t = biothings_client.get_client("gene")
+    t = bt.get_client("gene")
     gene_names = t.querymany(
         gene_ids, scopes=["entrezgene", "ensembl.gene", "uniprot"], fields=["name"]
     )
     return gene_names
 
 
+def get_bigg_metabolite_mapping(in_f):
+    bigg_map = {line[2].lower(): line[1] for line in line_generator(in_f, delimiter="\t")}
+    return bigg_map
+
+
+def get_primary_chem_id(line, bigg_map):
+    pubchem_id = line[3]
+    drug_id = line[7]
+    kegg_id = line[5]
+    smiles = line[10]
+    hmdb_id = line[6]
+    bigg_id = bigg_map.get(line[2].lower())
+
+    # (line, prefix) pairs for ID hierarchy
+    id_hierarchy = [
+        (pubchem_id, "PUBCHEM.COMPOUND"),
+        (drug_id, "DRUGBANK"),
+        (kegg_id, None),
+        (smiles, ""),
+        (hmdb_id, "HMDB"),
+        (bigg_id, "BIGG.METABOLITE"),
+    ]
+
+    def classify_kegg(val):
+        if val.startswith("C"):
+            return "KEGG.COMPOUND"
+        elif val.startswith("G"):
+            return "KEGG.GLYCAN"
+        elif val.startswith("D"):
+            return "KEGG.DRUG"
+        return "KEGG"
+
+    xrefs = {}
+    primary_id = None
+
+    for val, prefix in id_hierarchy:
+        if not val or val.strip().lower() == "not available":
+            continue
+        if prefix is None and val == kegg_id:
+            prefix = classify_kegg(val)
+
+        curie = f"{prefix}:{val}" if prefix else val
+        if prefix == "PUBCHEM.COMPOUND":
+            key = "pubchem_cid"
+        elif prefix == "DRUGBANK":
+            key = "drugbank"
+        elif prefix == "HMDB":
+            key = "hmdb"
+        elif prefix is not None and prefix.startswith("KEGG"):
+            key = "kegg"
+        elif prefix == "":
+            key = "smiles"
+        elif prefix == "BIGG.METABOLITE":
+            key = "bigg"
+        else:
+            continue
+
+        if primary_id is None:
+            primary_id = curie
+        xrefs.setdefault(key, curie)
+
+    return primary_id, xrefs
+
+
+def get_primary_gene_id(line):
+    ensembl_id = line[13]
+    ncbi_id = line[14]
+    hgnc_id = line[15]
+    uniprotkb = line[16]
+
+    # (line, prefix) pairs for ID hierarchy
+    id_hierarchy = [
+        (ncbi_id, "NCBIGene"),
+        (ensembl_id, "ENSEMBL"),
+        (hgnc_id, "HGNC"),
+        (uniprotkb, "UniProtKB"),
+    ]
+
+    xrefs = {}
+    primary_id = None
+
+    for val, prefix in id_hierarchy:
+        if not val or val.strip().lower() == "not available":
+            continue
+
+        curie = f"{prefix}:{val}" if prefix else val
+        if prefix == "NCBIGene":
+            key = "entrezgene"
+        else:
+            key = prefix.lower()
+
+        if primary_id is None:
+            primary_id = curie
+        xrefs.setdefault(key, curie)
+
+    return primary_id, xrefs
+
+
+async def pug_query_pubchem_description(
+    cid: int,
+    session: aiohttp.ClientSession,
+    sem: asyncio.Semaphore,
+    max_retries: int = 3,
+    delay: float = 1.0,
+):
+    url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/{cid}/JSON"
+    for attempt in range(max_retries):
+        async with sem:
+            try:
+                async with session.get(url, timeout=30) as resp:
+                    resp.raise_for_status()
+                    data = await resp.json()
+                break
+            except aiohttp.ClientError as e:
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(delay * (2**attempt))
+                    continue
+                else:
+                    raise e
+
+    description = None
+    synonyms = []
+
+    for sec in data.get("Record", {}).get("Section", []):
+        heading = sec.get("TOCHeading", "")
+        if heading == "Names and Identifiers" and description is None:
+            for sub in sec.get("Section", []):
+                if sub.get("TOCHeading") == "Record Description":
+                    for info in sub.get("Information", []):
+                        for mark in info.get("Value", {}).get("StringWithMarkup", []):
+                            text = mark.get("String", "").strip()
+                            if text:
+                                description = text
+                                break
+                        if description:
+                            break
+                elif sub.get("TOCHeading") == "Synonyms":
+                    for sec in sub.get("Section", []):
+                        for info in sec.get("Information", []):
+                            for mark in info.get("Value", {}).get("StringWithMarkup", []):
+                                text = mark.get("String", "").strip()
+                                if text:
+                                    synonyms.append(text.lower().strip())
+            break
+
+    seen = set()
+    synonyms = [s for s in synonyms if not (s in seen or seen.add(s))]
+
+    return cid, {
+        "id": f"PUBCHEM.COMPOUND:{cid}",
+        "description": f"{description}[PUBCHEM]" if description else "",
+        "synonyms": synonyms,
+    }
+
+
+async def get_batch_pubchem_descriptions_async(
+    cids: List[int],
+    workers: int = 5,
+) -> Dict[int, Dict[str, str]]:
+    cids = list(set(cids))
+
+    workers = min(workers, 5)
+    sem = asyncio.Semaphore(workers)
+    connector = aiohttp.TCPConnector(limit_per_host=workers)
+    cids = sorted(list(set(cids)))
+
+    results = {}
+    async with aiohttp.ClientSession(connector=connector) as session:
+        tasks = []
+        last_launch = 0.0
+
+        for cid in cids:
+            elapsed = time.perf_counter() - last_launch
+            if elapsed < 1.0 / 5:
+                await asyncio.sleep(1.0 / 5 - elapsed)
+            last_launch = time.perf_counter()
+
+            task = asyncio.create_task(pug_query_pubchem_description(cid, session, sem))
+            tasks.append(task)
+
+        for cid, payload in await tqdm_asyncio.gather(*tasks, total=len(tasks)):
+            if payload:
+                results[cid] = payload
+
+    return results
+
+
+def get_pubchem_descriptions(cids: List[int], workers: int = 5):
+    return asyncio.run(get_batch_pubchem_descriptions_async(cids, workers))
+
+
 def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
     """generates node dictionaries from meta_gene_net.csv file
     This function reads gene and metabolite data and processes it.
-    It generates object, subject, and association nodes.
 
     :param file_path: path to meta_gene_net.csv file
     :return: An iterator of dictionaries containing node information.
@@ -138,37 +336,6 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
         # create object node (genes)
         object_node = {"id": None, "symbol": line[12], "type": "biolink:Gene"}
 
-        assign_col_val_if_available(object_node, "entrezgene", line[14])
-        assign_col_val_if_available(object_node, "protein_size", line[17], int)
-
-        # add gene id via a hierarchical order: 1.entrezgene, 2.ensemblgene, 3.hgnc, and 4.uniportkb
-        if "entrezgene" in object_node:
-            assign_to_xrefs_if_available(object_node, "ensemblgene", line[13])
-        else:
-            assign_col_val_if_available(object_node, "ensemblgene", line[13])
-        if "entrezgene" not in object_node and "ensemblgene" not in object_node:
-            assign_col_val_if_available(object_node, "hgnc", line[15], int)
-        else:
-            assign_to_xrefs_if_available(object_node, "hgnc", line[15], int)
-        if (
-            "entrezgene" not in object_node
-            and "ensemblgene" not in object_node
-            and "hgnc" not in object_node
-        ):
-            assign_col_val_if_available(object_node, "uniprotkb", line[16])
-        else:
-            assign_to_xrefs_if_available(object_node, "uniprotkb", line[16])
-
-        # assign ids via a hierarchical order: 1.entrezgene, 2.ensemblgene, 3.hgnc, and 4.uniprotkb
-        if "entrezgene" in object_node:
-            object_node["id"] = f"NCBIGene:{object_node['entrezgene']}"
-        elif "ensemblgene" in object_node:
-            object_node["id"] = f"ENSEMBL:{object_node['ensemblgene']}"
-        elif "hgnc" in object_node:
-            object_node["id"] = f"HGNC:{object_node['hgnc']}"
-        else:
-            object_node["id"] = f"UniProtKG:{object_node['uniprotkb']}"
-
         # assign gene names by using biothings_client
         for key in ("entrezgene", "ensemblgene", "uniprotkb"):
             if key in object_node and object_node[key] in gene_name:
@@ -194,42 +361,8 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
             "type": "biolink:SmallMolecule",
         }
 
-        assign_col_val_if_available(subject_node, "pubchem_cid", line[3], int)
-        assign_col_val_if_available(subject_node, "drug_name", line[8].lower())
-        assign_col_val_if_available(subject_node, "chemical_formula", line[4])
-        assign_col_val_if_available(subject_node, "smiles", line[10])
-
-        # add chemicals via a hierarchical order: 1.pubchem_cid, 2.kegg_compound, 3.hmdb, and 4.drugbank
-        if "pubchem_cid" in subject_node:
-            assign_to_xrefs_if_available(subject_node, "kegg_compound", line[5])
-        else:
-            assign_col_val_if_available(subject_node, "kegg_compound", line[5])
-        if "pubchem_cid" not in subject_node and "kegg_compound" not in subject_node:
-            assign_col_val_if_available(subject_node, "hmdb", line[6])
-        else:
-            assign_to_xrefs_if_available(subject_node, "hmdb", line[6])
-        if (
-            "pubchem_cid" not in subject_node
-            and "kegg_compound" not in subject_node
-            and "drugbank" not in subject_node
-        ):
-            assign_col_val_if_available(subject_node, "drugbank", line[7])
-        else:
-            assign_to_xrefs_if_available(subject_node, "drugbank", line[7])
-
-        # assign chemical id via a hierarchical order: 1.pubchem_cid, and 2.kegg_compound
-        if "pubchem_cid" in subject_node:
-            subject_node["id"] = f"PUBCHEM.COMPOUND:{subject_node['pubchem_cid']}"
-        elif "kegg_compound" in subject_node:
-            subject_node["id"] = f"KEGG.COMPOUND:{subject_node['kegg_compound']}"
-        else:
-            subject_node["id"] = str(uuid.uuid4())
-
-        # association node has the qualifier, reference and source of metabolites
+        # association node
         association_node = {"predicate": "biolink:associated_with"}
-
-        assign_col_val_if_available(association_node, "score", line[19], float)
-        assign_col_val_if_available(association_node, "pmid", line[21], int)
 
         if line[9] and line[9] != "Unknown":
             association_node["sources"] = [src.strip().lower() for src in line[9].split(";")]
@@ -248,7 +381,7 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
             )
             association_node["category"] = "biolink:ChemicalAffectsGeneAssociation"
 
-        # combine all the nodes together
+        # combine all the nodes
         output_dict = {
             "_id": None,
             "association": association_node,
@@ -257,13 +390,13 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
         }
 
         if ":" in object_node["id"] and ":" in subject_node["id"]:
-            output_dict["_id"] = (
-                f"{subject_node['id'].split(':')[1].strip()}_associated_with_{object_node['id'].split(':')[1].strip()}"
-            )
+            output_dict[
+                "_id"
+            ] = f"{subject_node['id'].split(':')[1].strip()}_associated_with_{object_node['id'].split(':')[1].strip()}"
         else:
-            output_dict["_id"] = (
-                f"{subject_node['id']}_associated_with_{object_node['id'].split(':')[1].strip()}"
-            )
+            output_dict[
+                "_id"
+            ] = f"{subject_node['id']}_associated_with_{object_node['id'].split(':')[1].strip()}"
         yield output_dict
 
 
