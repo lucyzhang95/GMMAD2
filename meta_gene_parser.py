@@ -101,7 +101,7 @@ def get_gene_name(gene_ids: list) -> list:
     t = bt.get_client("gene")
     gene_q = t.querymany(gene_ids, scopes=["ensembl.gene"], fields=["name", "symbol"])
     gene_names = {
-        d["query"]: {"name": d["symbol"], "full_name": d["name"]}
+        d["query"]: {"name": d.get("symbol"), "full_name": d.get("name")}
         for d in gene_q
         if "notfound" not in d
     }
