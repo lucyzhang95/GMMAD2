@@ -458,6 +458,27 @@ def cache_data(in_f):
     pubchem_mw_logp = bt_get_mw_logp(pubchem_cids)
     print(f"Total pubchem_cid with molecular weight and xlogp: {len(pubchem_mw_logp)}")
     save_pickle(pubchem_mw_logp, "gmmad2_meta_gene_pubchem_mw.pkl")
+    
+    # cache gene/protein information
+    gene_ids = [
+        line[16]
+        if line[16] and line[16] != "Not available"
+        else line[13]
+        if line[13] and line[13] != "Not available"
+        else None
+        for line in line_generator(file_path)
+    ]
+    gene_ids = list(set(gene_ids))
+    print(f"Total unique gene/protein ids: {len(gene_ids)}")
+    uniprot_ids = [_id for _id in gene_ids if "ENSG" not in _id]
+    print(f"Total unique uniprot_ids: {len(set(uniprot_ids))}")
+    prot_info = get_protein_info(uniprot_ids)
+    gene_ids = [_id for _id in uniprot_ids if "ENSG" in _id]
+    print(f"Total unique gene_ids: {len(set(gene_ids))}")
+    gene_info = get_gene_info(gene_ids)
+    full_gene_info = prot_info | gene_info
+    print(f"Total unique gene/protein info: {len(full_gene_info)}")
+    save_pickle(full_gene_info, "gmmad2_meta_gene_uniprot_ensemble_info.pkl")
 
 
 def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
@@ -467,47 +488,10 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
     :param file_path: path to meta_gene_net.csv file
     :return: An iterator of dictionaries containing node information.
     """
-
-    # get gene ids
-    gene_ids = [
-        line[16]
-        if line[16] and line[16] != "Not available"
-        else line[13]
-        if line[13] and line[13] != "Not available"
-        else None
-        for line in line_generator(file_path)
-    ]
-
-    # get gene name using get_gene_name() function
-    gene_name = {
-        gene_id["query"]: gene_id
-        for gene_id in get_gene_name(gene_ids)
-        if "notfound" not in gene_id.keys() and "name" in gene_id.keys()
-    }
-
-    # parse the data
     for line in line_generator(file_path):
         # create object node (genes)
         object_node = {"id": None, "symbol": line[12], "type": "biolink:Gene"}
-
-        # assign gene names by using biothings_client
-        for key in ("entrezgene", "ensemblgene", "uniprotkb"):
-            if key in object_node and object_node[key] in gene_name:
-                object_node["name"] = gene_name[object_node[key]].get("name")
-                break
-
-        # add gene summary to the object_node
-        if line[18]:
-            object_node["summary"] = line[18]
-
-        # convert entrezgene to integers
-        if "entrezgene" in object_node:
-            object_node["entrezgene"] = int(object_node["entrezgene"])
-
-        # change object_node type to biolink:Protein if there is only uniprot exists
-        if "uniportkb" in object_node:
-            object_node["type"] = "biolink:Protein"
-
+        
         # create subject node (metabolites)
         subject_node = {
             "id": None,
