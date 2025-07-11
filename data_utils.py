@@ -1,6 +1,7 @@
 import csv
 import os
-from typing import Dict, Iterator, List
+import random
+from typing import Any, Dict, Iterator, List
 
 import pandas as pd
 
@@ -17,32 +18,36 @@ def line_generator(in_file: str | os.PathLike, delimiter=",", skip_header=False)
             yield line
 
 
-def check_line_fields(data: List[List]) -> Dict[int, int]:
+def check_line_fields(data: List[List]) -> Dict[int, List[Any]]:
     misaligned_lines = {}
     if not data:
         raise ValueError("Data is empty!")
 
     reference_length = len(data[0])
-
     for i, line in enumerate(data):
         if len(line) != reference_length:
-            misaligned_lines[i] = len(line)
+            misaligned_lines[i] = line
 
     return misaligned_lines
 
 
-def print_misalignment_report(misaligned_lines: Dict[int, int], total_lines: int):
+def print_misalignment_report(misaligned_lines: Dict[int, List[Any]], total_lines: int):
     """Prints a summary report of misaligned lines."""
     if not misaligned_lines:
         print("All lines have the same number of fields.")
     elif len(misaligned_lines) == 1:
-        line_index, num_fields = misaligned_lines.popitem()
-        print(f"Line {line_index} has a different number of fields: {num_fields}")
+        line_index, line_content = list(misaligned_lines.items())[0]
+        print(
+            f"Found 1 misaligned line has {len(line_content)} of fields at index {line_index} (out of {total_lines} total)."
+        )
+        print(f"Example line content: {line_content}")
     else:
         print(
             f"{len(misaligned_lines)} lines have different numbers of fields out of {total_lines} total lines."
         )
-        print(f"Details (line_index: field_count): {misaligned_lines}")
+        random_index = random.choice(list(misaligned_lines.keys()))
+        random_line = misaligned_lines[random_index]
+        print(f"Example line content: {random_line}")
 
 
 def get_columns(df: pd.DataFrame) -> list:
