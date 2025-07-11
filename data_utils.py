@@ -31,6 +31,20 @@ def check_line_fields(data: List[List]) -> Dict[int, int]:
     return misaligned_lines
 
 
+def print_misalignment_report(misaligned_lines: Dict[int, int], total_lines: int):
+    """Prints a summary report of misaligned lines."""
+    if not misaligned_lines:
+        print("All lines have the same number of fields.")
+    elif len(misaligned_lines) == 1:
+        line_index, num_fields = misaligned_lines.popitem()
+        print(f"Line {line_index} has a different number of fields: {num_fields}")
+    else:
+        print(
+            f"{len(misaligned_lines)} lines have different numbers of fields out of {total_lines} total lines."
+        )
+        print(f"Details (line_index: field_count): {misaligned_lines}")
+
+
 def get_columns(df: pd.DataFrame) -> list:
     return df.columns.tolist()
 
