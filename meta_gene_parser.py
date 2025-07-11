@@ -59,7 +59,9 @@ def save_pickle(obj, f_name):
 def load_pickle(f_name):
     path = os.path.join(CACHE_DIR, f_name)
     return (
-        pickle.load(open(path, "rb")) if os.path.exists(path) else print("The file does not exist.")
+        pickle.load(open(path, "rb"))
+        if os.path.exists(path)
+        else print(f"The pickle file {path} does not exist.")
     )
 
 
@@ -130,16 +132,13 @@ async def uniprot_query_protein_info(
                     continue
                 raise
 
-    accession = data.get("primaryAccession", "Accession not found")
+    rec = data.get("proteinDescription", {}).get("recommendedName", {})
 
-    full_name_val = (
-        data.get("proteinDescription", {})
-        .get("recommendedName", {})
-        .get("fullName", {})
-        .get("value")
-        or "FullName not found"
-    )
-    full_name = full_name_val.lower()
+    raw_full = rec.get("fullName", {}).get("value")
+    full_name = raw_full.lower() if isinstance(raw_full, str) else None
+
+    raw_short = rec.get("shortName", {}).get("value")
+    name = raw_short.lower() if isinstance(raw_short, str) else None
 
     desc = None
     for comment in data.get("comments", []):
@@ -152,7 +151,7 @@ async def uniprot_query_protein_info(
         desc = "Function not found"
 
     return uniprot_id, {
-        "name": accession,
+        "name": name,
         "full_name": full_name,
         "description": desc,
     }
@@ -446,6 +445,7 @@ def get_pubmed_metadata(pmids):
     :param pmids: a list of pmids obtained from core_table.txt
     :return: a dictionary with pmid as key and a dictionary with title, abstract, and doi as value.
     """
+    Entrez.email = os.getenv("EMAIL_ADDRESS")
     pmids = set(pmids)
     handle = Entrez.efetch(db="pubmed", id=",".join(map(str, pmids)), retmode="xml")
     records = Entrez.read(handle)
@@ -563,25 +563,29 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
     pubchem_mw = load_pickle("gmmad2_meta_gene_pubchem_mw.pkl")
     gene_info = load_pickle("gmmad2_meta_gene_uniprot_ensemble_info.pkl")
     bigg_mapping = load_pickle("gmmad2_micro_meta_bigg_mapping.pkl")
-    pmid_metadata = load_pickle("gmmad2_micro_meta_pmid_metadata.pkl")
+    pmid_metadata = load_pickle("gmmad2_meta_gene_pmid_metadata.pkl")
 
     for line in line_generator(file_path):
         uniprot_id = line[16] if line[16] and line[16] != "Not available" else None
         ensemble = line[13] if line[13] and line[13] != "Not available" else None
 
+        gene_record = (gene_info.get(uniprot_id) if uniprot_id else None) or (
+            gene_info.get(ensemble) if ensemble else None
+        )
+
         # object node (genes/proteins)
         object_node = {
             "id": f"UniProtKB:{uniprot_id}" if uniprot_id else f"ENSEMBL:{ensemble}",
-            "name": gene_info.get(uniprot_id).get("name", None)
-            if uniprot_id != "Not available"
-            else gene_info.get(ensemble).get("name", None),
-            "full_name": gene_info.get(uniprot_id).get("full_name", None)
-            if uniprot_id in gene_info
-            else gene_info.get(ensemble).get("full_name", None),
+            "name": gene_record.get("name") if gene_record else None,
+            "full_name": gene_record.get("full_name") if gene_record else None,
             "original_name": line[12],
-            "description": line[18]
-            if line[18] and line[18] != "Not available"
-            else gene_info.get(uniprot_id).get("description", None),
+            "description": (
+                line[18]
+                if line[18] and line[18] != "Not available"
+                else gene_record.get("description")
+                if gene_record
+                else None
+            ),
             "residue_num": int(line[17]) if line[17] else None,
             "type": "biolink:Protein",
             "xrefs": {},
@@ -635,6 +639,9 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
         else:
             evidence_type = "ECO:0000000"
 
+        pmid_key = line[21]
+        metadata = pmid_metadata.get(pmid_key) if pmid_key and pmid_key != "Not available" else None
+
         association_node = {
             "id": "RO:0002434",
             "predicate": "biolink:ChemicalGeneInteractionAssociation",
@@ -656,9 +663,9 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
             "publications": {
                 "pmid": int(line[21]) if line[21] and line[21] != "Not available" else None,
                 "type": "biolink:Publication",
-                "summary": pmid_metadata.get(line[21]).get("summary", None),
-                "name": pmid_metadata.get(line[21]).get("name", None),
-                "doi": pmid_metadata.get(line[21]).get("doi", None),
+                "summary": metadata.get("summary") if metadata else None,
+                "name": metadata.get("name") if metadata else None,
+                "doi": metadata.get("doi") if metadata else None,
             },
         }
         association_node = remove_empty_none_values(association_node)
