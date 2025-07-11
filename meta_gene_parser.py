@@ -471,7 +471,7 @@ def cache_data(in_f):
     print(f"Total unique uniprot_ids: {len(set(uniprot_ids))}")
     prot_info = get_protein_info(uniprot_ids)
     ensembl_gene_ids = [_id for _id in gene_ids if "ENSG" in _id]
-    print(f"Total unique gene_ids: {len(set(gene_ids))}")
+    print(f"Total unique gene_ids: {len(set(ensembl_gene_ids))}")
     gene_info = get_gene_name(ensembl_gene_ids )
     full_gene_info = prot_info | gene_info
     print(f"Total unique gene/protein info: {len(full_gene_info)}")
