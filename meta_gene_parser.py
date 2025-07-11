@@ -137,7 +137,7 @@ async def uniprot_query_protein_info(
     raw_full = rec.get("fullName", {}).get("value")
     full_name = raw_full.lower() if isinstance(raw_full, str) else None
 
-    raw_short = rec.get("shortName", {}).get("value")
+    raw_short = rec.get("shortNames", {}).get("value")
     name = raw_short.lower() if isinstance(raw_short, str) else None
 
     desc = None
