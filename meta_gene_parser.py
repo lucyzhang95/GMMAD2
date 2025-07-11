@@ -5,9 +5,7 @@ import os
 import pickle
 import time
 import uuid
-from collections import Counter
-from collections.abc import Iterator
-from typing import Dict, List
+from typing import Dict, Iterator, List
 
 import aiohttp
 import biothings_client as bt
@@ -472,7 +470,7 @@ def cache_data(in_f):
     prot_info = get_protein_info(uniprot_ids)
     ensembl_gene_ids = [_id for _id in gene_ids if "ENSG" in _id]
     print(f"Total unique gene_ids: {len(set(ensembl_gene_ids))}")
-    gene_info = get_gene_name(ensembl_gene_ids )
+    gene_info = get_gene_name(ensembl_gene_ids)
     full_gene_info = prot_info | gene_info
     print(f"Total unique gene/protein info: {len(full_gene_info)}")
     save_pickle(full_gene_info, "gmmad2_meta_gene_uniprot_ensemble_info.pkl")
@@ -524,16 +522,16 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
         # object node (genes/proteins)
         object_node = {
             "id": f"UniProtKB:{uniprot_id}" if uniprot_id else f"ENSEMBL:{ensemble}",
-            "name": gene_info.get(uniprot_id)["name"]
+            "name": gene_info.get(uniprot_id).get("name", None)
             if uniprot_id != "Not available"
-            else gene_info.get(ensemble)["name"],
-            "full_name": gene_info.get(uniprot_id)["full_name"]
+            else gene_info.get(ensemble).get("name", None),
+            "full_name": gene_info.get(uniprot_id).get("full_name", None)
             if uniprot_id in gene_info
-            else gene_info.get(ensemble)["full_name"],
+            else gene_info.get(ensemble).get("full_name", None),
             "original_name": line[12],
             "description": line[18]
             if line[18] and line[18] != "Not available"
-            else gene_info.get(uniprot_id)["description"],
+            else gene_info.get(uniprot_id).get("description", None),
             "residue_num": int(line[17]) if line[17] else None,
             "type": "biolink:Protein",
             "xrefs": {},
