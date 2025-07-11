@@ -1,4 +1,34 @@
+import csv
+import os
+from typing import Dict, Iterator, List
+
 import pandas as pd
+
+
+def line_generator(in_file: str | os.PathLike, delimiter=",", skip_header=True) -> Iterator[list]:
+    with open(in_file, "r") as in_f:
+        reader = csv.reader(in_f, delimiter=delimiter)
+        if skip_header:
+            next(reader)
+        else:
+            pass
+
+        for line in reader:
+            yield line
+
+
+def check_line_fields(data: List[List]) -> Dict[int, int]:
+    misaligned_lines = {}
+    if not data:
+        raise ValueError("Data is empty!")
+
+    reference_length = len(data[0])
+
+    for i, line in enumerate(data):
+        if len(line) != reference_length:
+            misaligned_lines[i] = len(line)
+
+    return misaligned_lines
 
 
 def get_columns(df: pd.DataFrame) -> list:
