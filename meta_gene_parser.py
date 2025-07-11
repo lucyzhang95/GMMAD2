@@ -112,52 +112,87 @@ def get_gene_name(gene_ids: list) -> list:
     return gene_names
 
 
-async def get_protein_info_async(session, uniprot_id):
+async def uniprot_query_protein_info(
+    uniprot_id: str,
+    session: aiohttp.ClientSession,
+    sem: asyncio.Semaphore,
+    max_retries: int = 3,
+    delay: float = 1.0,
+    timeout: float = 30.0,
+) -> (str, Dict[str, str]):
     url = f"https://rest.uniprot.org/uniprotkb/{uniprot_id}.json"
-    try:
-        async with session.get(url) as response:
-            if response.status != 200:
-                return None
+    for attempt in range(max_retries):
+        async with sem:
+            try:
+                async with session.get(url, timeout=timeout) as resp:
+                    resp.raise_for_status()
+                    data = await resp.json()
+                break
+            except aiohttp.ClientError:
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(delay * (2**attempt))
+                    continue
+                raise
 
-            data = await response.json()
+    accession = data.get("primaryAccession", "Accession not found")
 
-            prot_desc = data.get("proteinDescription", {})
-            rec_name = prot_desc.get("recommendedName", {})
-            full_name = rec_name.get("fullName", {})
-            name = full_name.get("value", "Name not found")
+    full_name_val = (
+        data.get("proteinDescription", {})
+        .get("recommendedName", {})
+        .get("fullName", {})
+        .get("value")
+        or "FullName not found"
+    )
+    full_name = full_name_val.lower()
 
-            func = None
-            for comment in data.get("comments", []):
-                if comment.get("commentType") == "FUNCTION":
-                    texts = comment.get("texts", [])
-                    if texts and texts[0].get("value"):
-                        func = texts[0]["value"]
-                        break
+    desc = None
+    for comment in data.get("comments", []):
+        if comment.get("commentType") == "FUNCTION":
+            texts = comment.get("texts", [])
+            if texts and texts[0].get("value"):
+                desc = texts[0]["value"]
+                break
+    if desc is None:
+        desc = "Function not found"
 
-            return {uniprot_id: {"name": name, "description": func}}
+    return uniprot_id, {
+        "name": accession,
+        "full_name": full_name,
+        "description": desc,
+    }
 
-    except Exception as e:
-        print(f"{uniprot_id} has an error: {e}")
 
+async def get_batch_protein_info_async(
+    uniprot_ids: List[str],
+    workers: int = 5,
+    rate_limit: float = 5.0,
+) -> Dict[str, Dict[str, str]]:
+    ids = sorted(set(uniprot_ids))
+    sem = asyncio.Semaphore(workers)
+    connector = aiohttp.TCPConnector(limit_per_host=workers)
+    results: Dict[str, Dict[str, str]] = {}
 
-async def get_batch_protein_info(uniprot_ids: List[str], batch_size=5, delay=1.0):
-    results = {}
-    unique_ids = list(set(uniprot_ids))
-    connector = aiohttp.TCPConnector(limit=batch_size)
     async with aiohttp.ClientSession(connector=connector) as session:
-        for i in range(0, len(unique_ids), batch_size):
-            batch = unique_ids[i : i + batch_size]
-            tasks = [get_protein_info_async(session, uid) for uid in batch]
-            batch_results = await asyncio.gather(*tasks)
-            for entry in batch_results:
-                if entry:
-                    results.update(entry)
-            await asyncio.sleep(delay)
+        tasks = []
+        last_launch = 0.0
+        for uid in ids:
+            elapsed = time.perf_counter() - last_launch
+            min_interval = 1.0 / rate_limit
+            if elapsed < min_interval:
+                await asyncio.sleep(min_interval - elapsed)
+            last_launch = time.perf_counter()
+
+            task = asyncio.create_task(uniprot_query_protein_info(uid, session, sem))
+            tasks.append(task)
+
+        for uid, payload in await tqdm_asyncio.gather(*tasks, total=len(tasks)):
+            results[uid] = payload
+
     return results
 
 
-def get_protein_info(uniprot_ids: List[str], batch_size=5, delay=1.0) -> Dict[str, Dict[str, str]]:
-    return asyncio.run(get_batch_protein_info(uniprot_ids, batch_size, delay))
+def get_protein_info(uniprot_ids: List[str], workers: int = 5) -> Dict[str, Dict[str, str]]:
+    return asyncio.run(get_batch_protein_info_async(uniprot_ids, workers))
 
 
 def get_bigg_metabolite_mapping(in_f):
