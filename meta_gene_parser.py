@@ -98,7 +98,7 @@ def get_gene_name(gene_ids: list) -> list:
     The IDs are searched across multiple scopes: "entrezgene", "ensembl.gene", and "uniprot".
 
     :param gene_ids: A list of gene IDs to be queried.
-    :type gene_ids: list
+    :type gene_ids: List
     :return: A list of dictionaries containing the gene names and associated information.
     """
     gene_ids = set(gene_ids)
@@ -298,6 +298,80 @@ async def get_batch_pubchem_descriptions_async(
 
 def get_pubchem_descriptions(cids: List[int], workers: int = 5):
     return asyncio.run(get_batch_pubchem_descriptions_async(cids, workers))
+
+
+def get_organism_type(node) -> str:
+    """
+    Inspect node['lineage'] for known taxids.
+    Return the matching biolink CURIE, or Other if no match.
+    Types include: 3 domains of life (Bacteria, Archaea, Eukaryota) and Virus.
+    """
+    taxon_map = {
+        2: "biolink:Bacterium",
+        2157: "Archaeon",
+        2759: "Eukaryote",
+        10239: "biolink:Virus",
+    }
+
+    lineage = node.get("lineage")
+    if not isinstance(lineage, list):
+        return "Other"
+    for taxid, organism_type in taxon_map.items():
+        if taxid in lineage:
+            return organism_type
+    return "Other"
+
+
+def bt_get_mw_logp(cids: list):
+    cids = sorted(set(cids))
+    t = bt.get_client("chem")
+    get_chem = t.querymany(
+        cids,
+        scopes="pubchem.cid",
+        fields=["pubchem.molecular_weight", "pubchem.monoisotopic_weight", "pubchem.xlogp"],
+    )
+
+    q_out = {}
+    for q in get_chem:
+        if "notfound" in q:
+            continue
+
+        pub = q.get("pubchem")
+        if isinstance(pub, list):
+            info = pub[0]
+        elif isinstance(pub, dict):
+            info = pub
+        else:
+            continue
+
+        mw = info.get("molecular_weight")
+        mono = info.get("monoisotopic_weight")
+        logp = info.get("xlogp")
+        q_out[q["query"]] = {
+            "molecular_weight": {
+                "average_molecular_weight": mw,
+                "monoisotopic_molecular_weight": mono,
+            },
+            "xlogp": logp,
+        }
+
+    return q_out
+
+
+def cache_data(in_f):
+    # cache pubchem descriptions
+    pubchem_cids = [
+        line[3] for line in line_generator(in_f) if line[3] and line[3] != "Not available"
+    ]
+    print(f"Total unique pubchem_cids: {len(set(pubchem_cids))}")
+    pubchem_descr = get_pubchem_descriptions(pubchem_cids, workers=5)
+    print(f"Total pubchem_cid with descriptions: {len(pubchem_descr)}")
+    save_pickle(pubchem_descr, "gmmad2_meta_gene_description.pkl")
+
+    # cache molecular weight and xlogp
+    pubchem_mw_logp = bt_get_mw_logp(pubchem_cids)
+    print(f"Total pubchem_cid with molecular weight and xlogp: {len(pubchem_mw_logp)}")
+    save_pickle(pubchem_mw_logp, "gmmad2_meta_gene_pubchem_mw.pkl")
 
 
 def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
