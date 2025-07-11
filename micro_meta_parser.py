@@ -656,7 +656,7 @@ def get_node_info(file_path: str | os.PathLike) -> Iterator[dict]:
             }
             subject_node = remove_empty_none_values(subject_node)
 
-        # association node has the habitat and source of the interaction
+        # the association node has the habitat and source of the interaction
         evidence_map = {
             "infores:wom": "ECO:0001230",  # mass spec + manual
             "infores:vmh": "ECO:0000218",  # manual assertion
