@@ -48,6 +48,7 @@ def print_misalignment_report(misaligned_lines: Dict[int, List[Any]], total_line
         random_index = random.choice(list(misaligned_lines.keys()))
         random_line = misaligned_lines[random_index]
         print(f"Example from line {random_index}: {random_line}")
+        print(f"Number of fields in this line: {len(random_line)}")
 
 
 def get_columns(df: pd.DataFrame) -> list:
