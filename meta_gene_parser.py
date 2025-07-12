@@ -5,6 +5,7 @@ import os
 import pickle
 import time
 import uuid
+from io import BufferedWriter
 from typing import Dict, Iterator, List
 
 import aiohttp
@@ -90,14 +91,14 @@ def line_generator(in_file: str | os.PathLike, delimiter=",", skip_header=True) 
             yield line
 
 
-def get_gene_name(gene_ids: list) -> list:
+def get_gene_name(gene_ids: list) -> dict:
     """
     Retrieves gene names for a given list of gene IDs using biothings_client
     The IDs are searched across multiple scopes: "ensembl.gene".
 
     :param gene_ids: A list of gene IDs to be queried.
     :type gene_ids: List
-    :return: A list of dictionaries containing the gene names and associated information.
+    :return: A dictionary containing the gene names and associated information.
     """
     gene_ids = set(gene_ids)
     t = bt.get_client("gene")
