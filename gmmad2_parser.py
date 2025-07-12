@@ -67,8 +67,11 @@ class CacheManager:
         return path
 
     def cache_data(self, f_path, gzip_path=None, bigg_path=None):
-        # TODO: implement generic caching logic
-        pass
+        if gzip_path is None:
+            gzip_path =
+
+
+
 
 
 class CSVParser:
@@ -136,28 +139,28 @@ class CSVParser:
 class NCBITaxonomyService:
     """NCBI Taxonomy lookups and ID remapping."""
 
-    def ensure_ncbi_taxdump(self, tar_gz_path: str | Path) -> Path:
-        tar_gz_path = Path(tar_gz_path)  # TODO: need to specify the path later
-        if tar_gz_path.exists():
-            print(f"NCBI taxdump found at {tar_gz_path}, using existing file.")
-            return tar_gz_path
+    def __init__(self):
+        """Initializes the service and the ETE3 NCBI Taxa object."""
+        self.ncbi = NCBITaxa()
+        print("NCBI Taxonomy Service initialized.")
 
-        print("NCBI taxdump not found – downloading via ETE3 …")
-        ncbi = NCBITaxa()
-        ncbi.update_taxonomy_database()
-        return tar_gz_path
-
-    def get_ncbi_taxdump_path(self, tar_gz_path=None) -> str:
-        """Ensures the NCBI taxdump.tar.gz file exists and returns its path.
-        Downloads the file if it's not found.
+    def _ensure_taxdump_exists(self, taxdump_path="taxdump.tar.gz") -> Path:
         """
-        return ensure_ncbi_taxdump(tar_gz_path)
-
-    def parse_taxid_from_ncbi_taxdump_merged(
-        self, tar_gz_path: str, f_name: str = "merged.dmp"
-    ) -> dict:
+        Ensures the taxdump file exists, downloading it if necessary.
+        Returns the valid path to the file.
         """
-        Parses 'merged.dmp' from the provided taxdump tarball.
+        taxdump_path = Path(taxdump_path)
+        if taxdump_path.exists():
+            print(f"{taxdump_path} is found, using existing file.")
+            return taxdump_path
+
+        print(f"NCBI taxdump not found at {taxdump_path} – downloading via ETE3…")
+        self.ncbi.update_taxonomy_database()
+        return Path(taxdump_path)
+
+    def get_merged_taxid_mapping(self, tar_gz_path: str, f_name: str = "merged.dmp") -> dict:
+        """
+        Parses 'merged.dmp' from the provided NCBI taxdump tarball.
         Returns a dictionary mapping old taxids to new taxids.
         """
         taxid_mapping = {}
@@ -169,21 +172,48 @@ class NCBITaxonomyService:
                     taxid_mapping[old_taxid] = new_taxid
         return taxid_mapping
 
-    def get_current_taxid(self, old_taxids, merged_mapping):
-        # TODO: map old IDs to current
-        pass
+    def get_current_taxid(self, old_taxids: list, merged_mapping: dict) -> dict[str, str]:
+        """
 
-    def get_taxon_info(self, taxids):
-        # TODO: fetch taxon info
-        pass
+        :param old_taxids: outdated taxids in a database
+        :param merged_mapping: output of get_merged_taxid_mapping
+        :return:
+        """
+        taxid_mapping = {}
+        for old_taxid in old_taxids:
+            taxid_mapping[old_taxid] = merged_mapping.get(old_taxid, None)
+        return taxid_mapping
 
-    def get_taxon_names(self, taxon_info):
-        # TODO: extract names
-        pass
+    def query_taxon_info_from_biothings(self, taxids: list) -> list:
+        """retrieves taxonomic information for a given list of taxon IDs from disease_species.csv
+
+        This function reads taxon IDs, removes duplicates, and queries taxonomic info from biothings_client
+        to retrieve detailed taxonomic information including scientific name, parent taxid, lineage, and rank.
+
+        :param taxids:
+        :return: A list of dictionaries containing taxonomic information.
+        """
+        taxids = sorted(set(taxids))
+        t = bt.get_client("taxon")
+        taxon_info = t.gettaxa(
+            taxids, fields=["scientific_name", "parent_taxid", "lineage", "rank"]
+        )
+        return taxon_info
+
+    def fetch_taxon_names_from_taxon_info(self, taxon_info: dict) -> list[str]:
+        """Extracts biothings names from the taxon_info dictionary."""
+        taxon_names = set()
+        for _, taxon in taxon_info.items():
+            if "scientific_name" in taxon:
+                taxon_names.add(taxon["scientific_name"].lower())
+        return list(taxon_names)
 
 
 class NCITTaxonomyService:
     """NCIT-based organism mappings and descriptions."""
+
+    def __init__(self):
+        self.NCIT_API_KEY = os.getenv("NCIT_API_KEY")
 
     def dump_ncit_source(self, name, out_path):
         # TODO: dump NCIT source
@@ -193,21 +223,93 @@ class NCITTaxonomyService:
         # TODO: build mapping
         pass
 
-    def fetch_ncit_description(self, session, name, sem):
-        # TODO: synchronous fetch
-        pass
+    async def async_query_ncit_taxon_description(
+        self, session: aiohttp.ClientSession, name: str, sem: asyncio.Semaphore
+    ) -> tuple[str, dict] or None:
+        SEARCH_URL = "https://data.bioontology.org/search"
+        params = {
+            "q": name,
+            "ontologies": "NCIT",
+            "apikey": self.NCIT_API_KEY,
+        }
+        async with sem:
+            async with session.get(SEARCH_URL, params=params) as resp:
+                resp.raise_for_status()
+                data = await resp.json()
+        for result in data.get("collection", []):
+            if not result:
+                continue
+            pref_label = result.get("prefLabel", "").lower()
+            if pref_label != name:
+                continue
+            definition = result.get("definition", [])
+            ncit_id = result.get("@id", "").split("#")[-1]
+            return name, {
+                "description": f"{definition[0]} [NCIT]" if definition else "",
+                "xrefs": {"ncit": ncit_id},
+            }
+        return None
 
-    async def get_ncit_taxon_description_async(self, taxon_names, max_concurrent=5):
-        # TODO: async fetch
-        pass
+    async def async_query_ncit_taxon_descriptions(
+        self, taxon_names, max_concurrent=5
+    ) -> dict[str, dict]:
+        unique_names = {n.lower() for n in taxon_names}
+        sem = asyncio.Semaphore(max_concurrent)
+        connector = aiohttp.TCPConnector(limit_per_host=max_concurrent)
+        async with aiohttp.ClientSession(connector=connector) as session:
+            tasks = [
+                self.async_query_ncit_taxon_description(session, name, sem) for name in unique_names
+            ]
+            results = await asyncio.gather(*tasks)
+        return {name: data for item in results if item for name, data in (item,)}
 
-    def get_ncit_taxon_description(self, taxon_names):
-        # TODO: batch fetch
-        pass
+    def run_async_query_ncit_taxon_descriptions(self, taxon_names):
+        """
 
-    def add_description_to_taxon_info(self, taxon_info, descriptions):
-        # TODO: annotate taxon info
-        pass
+        :param taxon_names:
+        :return:
+        {
+           "550":{
+              "query":"550",
+              "_id":"550",
+              "_version":1,
+              "lineage":[
+                 550,
+                 354276,
+                 547,
+                 543,
+                 91347,
+                 1236,
+                 1224,
+                 3379134,
+                 2,
+                 131567,
+                 1
+              ],
+              "parent_taxid":354276,
+              "rank":"species",
+              "scientific_name":"enterobacter cloacae",
+              "description": "A species of facultatively anaerobic, Gram negative, rod shaped bacterium in the phylum Proteobacteria. This species is motile by peritrichous flagella, oxidase, urease and indole negative, catalase positive, reduces nitrate, does not degrade pectate and produces acid from sorbitol. E. cloacae is associated with hospital-acquired urinary and respiratory tract infections and is used in industry for explosives biodegradation. [NCIT]",
+              "xrefs": {
+                 "ncit":"C86360"
+              }
+           }
+        }
+        """
+        return asyncio.run(self.async_query_ncit_taxon_descriptions(taxon_names))
+
+    def update_taxon_info_with_ncit_description(self, taxon_info: dict, descriptions: dict) -> dict:
+        """
+
+        :param taxon_info: output of NCBITaxonomyService.query_taxon_info_from_biothings
+        :param descriptions: output of NCITTaxonomyService.run_async_query_ncit_taxon_descriptions
+        :return:
+        """
+        for info in taxon_info.values():
+            name = info.get("scientific_name").lower()
+            descr_info = descriptions.get(name, {})
+            info.update(descr_info)
+        return taxon_info
 
 
 class PubChemService:
@@ -266,6 +368,45 @@ class CheminformaticsUtils:
         pass
 
 
+class ParserHelpers:
+    def get_organism_type(self, node) -> str:
+        """
+        Inspect node['lineage'] for known taxids.
+        Return the matching biolink CURIE, or Other if no match.
+        Types include: 3 domains of life (Bacteria, Archaea, Eukaryota) and Virus.
+        """
+        taxon_map = {
+            2: "biolink:Bacterium",
+            2157: "Archaeon",
+            2759: "Eukaryote",
+            10239: "biolink:Virus",
+        }
+
+        for taxid, organism_type in taxon_map.items():
+            if taxid in node.get("lineage", []):
+                return organism_type
+
+        return "Other"
+
+    def remove_empty_none_values(self, obj):
+        if isinstance(obj, dict):
+            cleaned = {}
+            for k, v in obj.items():
+                v_clean = self.remove_empty_none_values(v)
+                if v_clean not in (None, {}, []):
+                    cleaned[k] = v_clean
+            return cleaned
+
+        if isinstance(obj, list):
+            cleaned_list = []
+            for v in obj:
+                v_clean = self.remove_empty_none_values(v)
+                if v_clean not in (None, {}, []):
+                    cleaned_list.append(v_clean)
+            return cleaned_list
+        return obj
+
+
 class GMMAD2Parser:
     """
     Parses and merges microbe-disease, microbe-metabolite,
@@ -276,14 +417,16 @@ class GMMAD2Parser:
         self,
         csv_parser: CSVParser,
         cache_mgr: CacheManager,
-        taxonomy_svc: TaxonomyService,
-        ncit_svc: NCITService,
+        taxonomy_svc: NCBITaxonomyService,
+        ncit_svc: NCITTaxonomyService,
+        parser_helpers: ParserHelpers,
     ):
         load_dotenv()
         self.csv = csv_parser
         self.cache = cache_mgr
         self.taxonomy = taxonomy_svc
         self.ncit = ncit_svc
+        self.parser_helpers = parser_helpers
 
     def parse_microbe_disease(self, in_file):
         # TODO: implement parsing
