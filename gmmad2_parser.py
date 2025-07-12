@@ -330,13 +330,15 @@ class CacheHelper:
         """Helper method to construct the full path for a cache file."""
         return os.path.join(self.cache_dir, f_name)
 
-    def save_pickle(self, obj, f_name: str) -> str:
+    def save_pickle(self, obj, f_name: str):
         """Saves an object to a pickle file in the cache directory."""
         path = self._get_path(f_name)
-        with open(path, "wb") as out_f:
-            pickle.dump(obj, out_f)
-        print(f"{path} saved to cache.")
-        return path
+        try:
+            with open(path, "wb") as out_f:
+                pickle.dump(obj, out_f)
+            print(f"Saved pickle to: {path}")
+        except (IOError, pickle.PicklingError) as e:
+            print(f"Error saving pickle file {path}: {e}")
 
     def load_pickle(self, f_name: str):
         """Loads an object from a pickle file. Returns None if the file doesn't exist."""
@@ -344,7 +346,6 @@ class CacheHelper:
         if not os.path.exists(path):
             print(f"{path} does not exist.")
             return None
-
         try:
             with open(path, "rb") as in_f:
                 return pickle.load(in_f)
@@ -352,98 +353,39 @@ class CacheHelper:
             print(f"Error loading pickle file {path}: {e}")
             return None
 
-    def update_pickle(self, f_name: str, new_data: dict):
-        path = self._get_path(f_name)
-
-        if os.path.exists(path):
-            try:
-                with open(path, "rb") as in_f:
-                    existing_dict = pickle.load(in_f)
-                    if not isinstance(existing_dict, dict):
-                        print(f"Warning: Data in {path} is not a dictionary. Overwriting.")
-            except (pickle.UnpicklingError, EOFError) as e:
-                print(f"Error loading pickle {path}: {e}.")
-        else:
-            print(f"{path} does not exist. Creating new file.")
-            existing_dict = {}
-
-        keys_added = False
-        for key, value in new_data.items():
-            if key not in existing_dict:
-                existing_dict[key] = value
-                keys_added = True
-
-        if not keys_added:
-            print("No new keys to add. Data is already up-to-date.")
-            return existing_dict
-
-        try:
-            with open(path, "wb") as out_f:
-                pickle.dump(existing_dict, out_f)
-            print(f"Successfully updated and saved dictionary to {path}")
-        except (IOError, pickle.PicklingError) as e:
-            print(f"Error saving updated pickle file {path}: {e}")
-            return None
-
-        return existing_dict
-
-    def save_json(self, obj, f_name: str) -> str:
+    def save_json(self, obj, f_name: str, indent=4) -> str:
         """Saves an object to a JSON file in the cache directory."""
         path = self._get_path(f_name)
-        with open(path, "w", encoding="utf-8") as out_f:
-            json.dump(obj, out_f, indent=4)
-        print(f"Saved: {path}")
-        return path
+        try:
+            with open(path, "w", encoding="utf-8") as out_f:
+                json.dump(obj, out_f, indent=indent)
+            print(f"Saved JSON to: {path}")
+        except (IOError, TypeError) as e:
+            print(f"Error saving JSON file {path}: {e}")
+
+    def load_json(self, f_name: str):
+        """Loads an object from a JSON file. Returns None if it fails."""
+        path = self._get_path(f_name)
+        if not os.path.exists(path):
+            return None
+        try:
+            with open(path, "r", encoding="utf-8") as in_f:
+                return json.load(in_f)
+        except (IOError, json.JSONDecodeError) as e:
+            print(f"Error loading JSON file {path}: {e}")
+            return None
 
 
 class CacheManager(CacheHelper):
     """CacheManager for managing on-disk caches and serialization."""
+
+    CACHE_FILENAME = "gmmad2_all_association_cache.pkl"
 
     def __init__(self, cache_dir=None):
         """Initializes the CacheManager and ensures the cache directory exists."""
         super().__init__(cache_dir)
         print(f"CacheManager initialized. Cache directory is {self.cache_dir}")
 
-    def cache_data(
-            self,
-            f_path: str,
-            relationship: str,
-            gzip_path: str | None = None,
-            bigg_path: str | None = None
-    ):
-        """
-        Build and cache exactly one relationship’s data under the given `relationship`
-        label inside gmmad2_all_cache.pkl.
-        """
-        if relationship == "microbe-disease":
-            data = self._build_microbe_disease(f_path, gzip_path)
-        elif relationship == "microbe-metabolite":
-            data = self._build_microbe_metabolite(f_path, gzip_path, bigg_path)
-        elif relationship == "metabolite-gene":
-            data = self._build_metabolite_gene(f_path)
-        else:
-            raise ValueError(f"Unknown relationship {relationship!r}")
-
-        def _build_microbe_disease(self, f_path, gzip_path):
-            return {
-                "taxon_info": taxon_info_w_descr,
-            }
-
-        def _build_microbe_metabolite(self, f_path, gzip_path, bigg_path):
-            return {
-                "pubchem_descr": pubchem_descr,
-                "mw_logp": pubchem_mw_logp,
-                "bigg_map": bigg_mapping,
-                "taxon_info": taxon_info,
-            }
-
-        def _build_metabolite_gene(self, f_path):
-            return {
-                "pubchem_descr": pubchem_descr,
-                "mw_logp": pubchem_mw_logp,
-                "protein_gene_info": full_gene_info,
-                "pmid_meta": pmid_metadata,
-            }
 
 
 class ParserHelper:
