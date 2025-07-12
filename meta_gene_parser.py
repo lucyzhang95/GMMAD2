@@ -132,11 +132,24 @@ async def uniprot_query_protein_info(
                     continue
                 raise
 
-    rec = data.get("proteinDescription", {}).get("recommendedName", {})
-
-    raw_full = rec.get("fullName", {}).get("value")
+    rec_name = data.get("proteinDescription", {}).get("recommendedName", {})
+    raw_full = rec_name.get("fullName", {}).get("value")
     full_name = raw_full.lower() if isinstance(raw_full, str) else None
-    raw_short = next((sn.get("value") for sn in rec.get("shortNames", []) if sn.get("value")), None)
+
+    raw_short = next(
+        (sn.get("value") for sn in rec_name.get("shortNames", []) if sn.get("value")), None
+    )
+    if raw_short is None:
+        alter_list = data.get("proteinDescription", {}).get("alternativeNames", [])
+        raw_short = next(
+            (
+                sn.get("value")
+                for alt in alter_list
+                for sn in alt.get("shortNames", [])
+                if sn.get("value")
+            ),
+            None,
+        )
     name = raw_short if isinstance(raw_short, str) else None
 
     desc = None
