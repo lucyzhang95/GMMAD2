@@ -47,7 +47,7 @@ CACHE_DIR = os.path.join(os.getcwd(), "cache")
 os.makedirs(CACHE_DIR, exist_ok=True)
 
 
-def save_pickle(obj, f_name):
+def save_pickle(obj, f_name) -> None:
     """
     :param obj: data to be saved as a pickle file
     :param f_name: files should only be existing in the cache directory
