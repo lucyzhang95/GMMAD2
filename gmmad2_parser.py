@@ -48,7 +48,7 @@ class CacheManager:
         """Loads an object from a pickle file. Returns None if the file doesn't exist."""
         path = self._get_path(f_name)
         if not os.path.exists(path):
-            print(f"Cache miss: {path} does not exist.")
+            print(f"{path} does not exist.")
             return None
 
         try:
@@ -57,6 +57,41 @@ class CacheManager:
         except (pickle.UnpicklingError, EOFError) as e:
             print(f"Error loading pickle file {path}: {e}")
             return None
+
+    def update_pickle(self, f_name: str, new_data: dict):
+        path = self._get_path(f_name)
+
+        if os.path.exists(path):
+            try:
+                with open(path, "rb") as in_f:
+                    existing_dict = pickle.load(in_f)
+                    if not isinstance(existing_dict, dict):
+                        print(f"Warning: Data in {path} is not a dictionary. Overwriting.")
+            except (pickle.UnpicklingError, EOFError) as e:
+                print(f"Error loading pickle {path}: {e}.")
+        else:
+            print(f"{path} does not exist. Creating new file.")
+            existing_dict = {}
+
+        keys_added = False
+        for key, value in new_data.items():
+            if key not in existing_dict:
+                existing_dict[key] = value
+                keys_added = True
+
+        if not keys_added:
+            print("No new keys to add. Data is already up-to-date.")
+            return existing_dict
+
+        try:
+            with open(path, "wb") as out_f:
+                pickle.dump(existing_dict, out_f)
+            print(f"Successfully updated and saved dictionary to {path}")
+        except (IOError, pickle.PicklingError) as e:
+            print(f"Error saving updated pickle file {path}: {e}")
+            return None
+
+        return existing_dict
 
     def save_json(self, obj, f_name: str) -> str:
         """Saves an object to a JSON file in the cache directory."""
