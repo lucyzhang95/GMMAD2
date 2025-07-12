@@ -21,94 +21,6 @@ from ete3 import NCBITaxa
 from tqdm.asyncio import tqdm, tqdm_asyncio
 
 
-class CacheManager:
-    """Generic on-disk cache and serialization helpers."""
-
-    DEFAULT_CACHE_DIR = os.path.join(os.getcwd(), "cache")
-
-    def __init__(self, cache_dir=None):
-        """Initializes the CacheManager and ensures the cache directory exists."""
-        self.cache_dir = cache_dir or self.DEFAULT_CACHE_DIR
-        os.makedirs(self.cache_dir, exist_ok=True)
-        print(f"CacheManager initialized. Cache directory is {self.cache_dir}")
-
-    def _get_path(self, f_name: str) -> str:
-        """Helper method to construct the full path for a cache file."""
-        return os.path.join(self.cache_dir, f_name)
-
-    def save_pickle(self, obj, f_name: str) -> str:
-        """Saves an object to a pickle file in the cache directory."""
-        path = self._get_path(f_name)
-        with open(path, "wb") as out_f:
-            pickle.dump(obj, out_f)
-        print(f"{path} saved to cache.")
-        return path
-
-    def load_pickle(self, f_name: str):
-        """Loads an object from a pickle file. Returns None if the file doesn't exist."""
-        path = self._get_path(f_name)
-        if not os.path.exists(path):
-            print(f"{path} does not exist.")
-            return None
-
-        try:
-            with open(path, "rb") as in_f:
-                return pickle.load(in_f)
-        except (pickle.UnpicklingError, EOFError) as e:
-            print(f"Error loading pickle file {path}: {e}")
-            return None
-
-    def update_pickle(self, f_name: str, new_data: dict):
-        path = self._get_path(f_name)
-
-        if os.path.exists(path):
-            try:
-                with open(path, "rb") as in_f:
-                    existing_dict = pickle.load(in_f)
-                    if not isinstance(existing_dict, dict):
-                        print(f"Warning: Data in {path} is not a dictionary. Overwriting.")
-            except (pickle.UnpicklingError, EOFError) as e:
-                print(f"Error loading pickle {path}: {e}.")
-        else:
-            print(f"{path} does not exist. Creating new file.")
-            existing_dict = {}
-
-        keys_added = False
-        for key, value in new_data.items():
-            if key not in existing_dict:
-                existing_dict[key] = value
-                keys_added = True
-
-        if not keys_added:
-            print("No new keys to add. Data is already up-to-date.")
-            return existing_dict
-
-        try:
-            with open(path, "wb") as out_f:
-                pickle.dump(existing_dict, out_f)
-            print(f"Successfully updated and saved dictionary to {path}")
-        except (IOError, pickle.PicklingError) as e:
-            print(f"Error saving updated pickle file {path}: {e}")
-            return None
-
-        return existing_dict
-
-    def save_json(self, obj, f_name: str) -> str:
-        """Saves an object to a JSON file in the cache directory."""
-        path = self._get_path(f_name)
-        with open(path, "w", encoding="utf-8") as out_f:
-            json.dump(obj, out_f, indent=4)
-        print(f"Saved: {path}")
-        return path
-
-    def cache_data(self, f_path, gzip_path=None, bigg_path=None):
-        if gzip_path is None:
-            gzip_path =
-
-
-
-
-
 class CSVParser:
     """Lightweight generator for large CSV/TXT tables."""
 
@@ -350,11 +262,11 @@ class NCITTaxonomyService:
 class PubChemService:
     """PubChem PUG-REST description fetchers."""
 
-    def pug_query_pubchem_description(self, cid, session, sem, max_retries=3, delay=1.0):
+    def query_pug_pubchem_description(self, cid, session, sem, max_retries=3, delay=1.0):
         # TODO: implement PUG-REST query
         pass
 
-    async def get_batch_pubchem_descriptions_async(self, cids, workers=5):
+    async def async_query_pubchem_descriptions(self, cids, workers=5):
         # TODO: async batch fetch
         pass
 
@@ -403,7 +315,138 @@ class CheminformaticsUtils:
         pass
 
 
-class ParserHelpers:
+class CacheHelper:
+    """Generic on-disk cache and serialization helpers."""
+
+    DEFAULT_CACHE_DIR = os.path.join(os.getcwd(), "cache")
+
+    def __init__(self, cache_dir=None):
+        """Initializes the CacheManager and ensures the cache directory exists."""
+        self.cache_dir = cache_dir or self.DEFAULT_CACHE_DIR
+        os.makedirs(self.cache_dir, exist_ok=True)
+        print(f"CacheManager initialized. Cache directory is {self.cache_dir}")
+
+    def _get_path(self, f_name: str) -> str:
+        """Helper method to construct the full path for a cache file."""
+        return os.path.join(self.cache_dir, f_name)
+
+    def save_pickle(self, obj, f_name: str) -> str:
+        """Saves an object to a pickle file in the cache directory."""
+        path = self._get_path(f_name)
+        with open(path, "wb") as out_f:
+            pickle.dump(obj, out_f)
+        print(f"{path} saved to cache.")
+        return path
+
+    def load_pickle(self, f_name: str):
+        """Loads an object from a pickle file. Returns None if the file doesn't exist."""
+        path = self._get_path(f_name)
+        if not os.path.exists(path):
+            print(f"{path} does not exist.")
+            return None
+
+        try:
+            with open(path, "rb") as in_f:
+                return pickle.load(in_f)
+        except (pickle.UnpicklingError, EOFError) as e:
+            print(f"Error loading pickle file {path}: {e}")
+            return None
+
+    def update_pickle(self, f_name: str, new_data: dict):
+        path = self._get_path(f_name)
+
+        if os.path.exists(path):
+            try:
+                with open(path, "rb") as in_f:
+                    existing_dict = pickle.load(in_f)
+                    if not isinstance(existing_dict, dict):
+                        print(f"Warning: Data in {path} is not a dictionary. Overwriting.")
+            except (pickle.UnpicklingError, EOFError) as e:
+                print(f"Error loading pickle {path}: {e}.")
+        else:
+            print(f"{path} does not exist. Creating new file.")
+            existing_dict = {}
+
+        keys_added = False
+        for key, value in new_data.items():
+            if key not in existing_dict:
+                existing_dict[key] = value
+                keys_added = True
+
+        if not keys_added:
+            print("No new keys to add. Data is already up-to-date.")
+            return existing_dict
+
+        try:
+            with open(path, "wb") as out_f:
+                pickle.dump(existing_dict, out_f)
+            print(f"Successfully updated and saved dictionary to {path}")
+        except (IOError, pickle.PicklingError) as e:
+            print(f"Error saving updated pickle file {path}: {e}")
+            return None
+
+        return existing_dict
+
+    def save_json(self, obj, f_name: str) -> str:
+        """Saves an object to a JSON file in the cache directory."""
+        path = self._get_path(f_name)
+        with open(path, "w", encoding="utf-8") as out_f:
+            json.dump(obj, out_f, indent=4)
+        print(f"Saved: {path}")
+        return path
+
+
+class CacheManager(CacheHelper):
+    """CacheManager for managing on-disk caches and serialization."""
+
+    def __init__(self, cache_dir=None):
+        """Initializes the CacheManager and ensures the cache directory exists."""
+        super().__init__(cache_dir)
+        print(f"CacheManager initialized. Cache directory is {self.cache_dir}")
+
+    def cache_data(
+            self,
+            f_path: str,
+            relationship: str,
+            gzip_path: str | None = None,
+            bigg_path: str | None = None
+    ):
+        """
+        Build and cache exactly one relationship’s data under the given `relationship`
+        label inside gmmad2_all_cache.pkl.
+        """
+        if relationship == "microbe-disease":
+            data = self._build_microbe_disease(f_path, gzip_path)
+        elif relationship == "microbe-metabolite":
+            data = self._build_microbe_metabolite(f_path, gzip_path, bigg_path)
+        elif relationship == "metabolite-gene":
+            data = self._build_metabolite_gene(f_path)
+        else:
+            raise ValueError(f"Unknown relationship {relationship!r}")
+
+        def _build_microbe_disease(self, f_path, gzip_path):
+            return {
+                "taxon_info": taxon_info_w_descr,
+            }
+
+        def _build_microbe_metabolite(self, f_path, gzip_path, bigg_path):
+            return {
+                "pubchem_descr": pubchem_descr,
+                "mw_logp": pubchem_mw_logp,
+                "bigg_map": bigg_mapping,
+                "taxon_info": taxon_info,
+            }
+
+        def _build_metabolite_gene(self, f_path):
+            return {
+                "pubchem_descr": pubchem_descr,
+                "mw_logp": pubchem_mw_logp,
+                "protein_gene_info": full_gene_info,
+                "pmid_meta": pmid_metadata,
+            }
+
+
+class ParserHelper:
     def get_organism_type(self, node) -> str:
         """
         Inspect node['lineage'] for known taxids.
@@ -422,6 +465,60 @@ class ParserHelpers:
                 return organism_type
 
         return "Other"
+
+    def assign_metabolite_primary_id(self, line, bigg_map):
+        pubchem_id = line[6]
+        kegg_id = line[8]
+        smiles = line[18]
+        hmdb_id = line[19]
+        bigg_id = bigg_map.get(line[5].lower())
+
+        # (line, prefix) pairs for ID hierarchy
+        id_hierarchy = [
+            (pubchem_id, "PUBCHEM.COMPOUND"),
+            (kegg_id, None),
+            (smiles, ""),
+            (hmdb_id, "HMDB"),
+            (bigg_id, "BIGG.METABOLITE"),
+        ]
+
+        def classify_kegg(val):
+            if val.startswith("C"):
+                return "KEGG.COMPOUND"
+            elif val.startswith("G"):
+                return "KEGG.GLYCAN"
+            elif val.startswith("D"):
+                return "KEGG.DRUG"
+            return "KEGG"
+
+        xrefs = {}
+        primary_id = None
+
+        for val, prefix in id_hierarchy:
+            if not val or val.strip().lower() == "not available":
+                continue
+            if prefix is None and val == kegg_id:
+                prefix = classify_kegg(val)
+
+            curie = f"{prefix}:{val}" if prefix else val
+            if prefix == "PUBCHEM.COMPOUND":
+                key = "pubchem_cid"
+            elif prefix == "HMDB":
+                key = "hmdb"
+            elif prefix is not None and prefix.startswith("KEGG"):
+                key = "kegg"
+            elif prefix == "":
+                key = "smiles"
+            elif prefix == "BIGG.METABOLITE":
+                key = "bigg"
+            else:
+                continue
+
+            if primary_id is None:
+                primary_id = curie
+            xrefs.setdefault(key, curie)
+
+        return primary_id, xrefs
 
     def remove_empty_none_values(self, obj):
         if isinstance(obj, dict):
@@ -454,7 +551,7 @@ class GMMAD2Parser:
         cache_mgr: CacheManager,
         taxonomy_svc: NCBITaxonomyService,
         ncit_svc: NCITTaxonomyService,
-        parser_helpers: ParserHelpers,
+        parser_helpers: ParserHelper,
     ):
         load_dotenv()
         self.csv = csv_parser
