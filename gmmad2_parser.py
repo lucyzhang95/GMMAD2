@@ -105,7 +105,7 @@ class NCBITaxonomyService:
         self.ncbi.update_taxonomy_database()
         return Path(taxdump_path)
 
-    def get_merged_taxid_mapping(self, tar_gz_path: str, f_name: str = "merged.dmp") -> dict:
+    def get_taxid_mapping_from_ncbi_merged_dmp(self, tar_gz_path: str = "taxdump.tar.gz", f_name: str = "merged.dmp") -> dict:
         """
         Parses 'merged.dmp' from the provided NCBI taxdump tarball.
         Returns a dictionary mapping old taxids to new taxids.
@@ -119,7 +119,7 @@ class NCBITaxonomyService:
                     taxid_mapping[old_taxid] = new_taxid
         return taxid_mapping
 
-    def get_current_taxid(self, old_taxids: list, merged_mapping: dict) -> dict[str, str]:
+    def get_current_taxid_mapping(self, old_taxids: list, merged_mapping: dict) -> dict[str, str]:
         """
 
         :param old_taxids: outdated taxids in a database
@@ -1018,12 +1018,13 @@ class DataLoader:
 
 if __name__ == "__main__":
     csv_parser = CSVParser()
-    manager = CacheManager()
+    cache_manager = CacheManager()
+    ncbi_svc = NCBITaxonomyService()
 
     print("\n--- FIRST RUN: Caching initial set of taxids ---")
     midi_path = os.path.join("downloads", "disease_species.csv")
-    midi_taxids = [line[5] for line in CSVParser().line_generator_for_microbe_disease(midi_path)]
-    manager.cache_entity("taxon_info", taxids=midi_taxids)
+    midi_taxids = [line[5] for line in csv_parser.line_generator_for_microbe_disease(midi_path)]
+    cache_manager.cache_entity("taxon_info", taxids=midi_taxids)
 
     print("\n\n--- SECOND RUN: Caching an overlapping set of taxids ---")
     mime_path = os.path.join("downloads", "micro_metabolic.csv")
@@ -1036,15 +1037,21 @@ if __name__ == "__main__":
         for line in csv_parser.line_generator(mime_path)
     ]
     mime_taxids = [t for t in mime_taxids if t]
-    manager.cache_entity("taxon_info", taxids=mime_taxids)
+    cache_manager.cache_entity("taxon_info", taxids=mime_taxids)
 
-    print("\n\n--- VERIFICATION ---")
-    final_cache = manager.load_pickle("gmmad2_taxon_info.pkl")
-    print("Final cache contains all unique taxids:")
-    print(len(final_cache.keys()))
-
-    taxid_not_found = manager.load_pickle("gmmad2_taxon_info_notfound.pkl")
+    taxid_not_found = cache_manager.load_pickle("gmmad2_taxon_info_notfound.pkl")
     print(f"\n'Taxid Not Found' cache contains {len(taxid_not_found)} unfound taxids:")
     print(taxid_not_found)
 
+    print("\n\n--- THIRD RUN: Caching a new mapped set of taxids ---")
+    taxid_map = ncbi_svc.get_taxid_mapping_from_ncbi_merged_dmp()
+    new_taxid_map = ncbi_svc.get_current_taxid_mapping(taxid_not_found, taxid_map)
+    new_taxids = [new_taxid for new_taxid in new_taxid_map.values() if new_taxid is not None]
+    cache_manager.cache_entity("taxon_info", taxids=new_taxids)
 
+    print("\n\n--- VERIFICATION ---")
+    final_cache = cache_manager.load_pickle("gmmad2_taxon_info.pkl")
+    print("Final cache contains all unique taxids:")
+    print(len(final_cache.keys()))
+
+    if
