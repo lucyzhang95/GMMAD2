@@ -18,7 +18,7 @@ import requests
 from Bio import Entrez
 from dotenv import load_dotenv
 from ete3 import NCBITaxa
-from tqdm.asyncio import tqdm, tqdm_asyncio
+from tqdm.asyncio import tqdm
 
 
 class CSVParser:
@@ -477,32 +477,23 @@ class UniProtService:
         self,
         uniprot_ids: List[str],
         workers: int = 5,
-        rate_limit: float = 5.0,
     ) -> Dict[str, Dict[str, str]]:
-        ids = sorted(set(uniprot_ids))
+
+        unique_ids = sorted(list(set(uniprot_ids)))
+
         sem = asyncio.Semaphore(workers)
         connector = aiohttp.TCPConnector(limit_per_host=workers)
-        results: Dict[str, Dict[str, str]] = {}
 
         async with aiohttp.ClientSession(connector=connector) as session:
-            tasks = []
-            last_launch = 0.0
-            for uid in ids:
-                elapsed = time.perf_counter() - last_launch
-                min_interval = 1.0 / rate_limit
-                if elapsed < min_interval:
-                    await asyncio.sleep(min_interval - elapsed)
-                last_launch = time.perf_counter()
+            tasks = [
+                self.async_query_uniprot_name_and_function(uid, session, sem) for uid in unique_ids
+            ]
 
-                task = asyncio.create_task(
-                    self.async_query_uniprot_name_and_function(uid, session, sem)
-                )
-                tasks.append(task)
+            print(f"Querying UniProt for {len(unique_ids)} IDs...")
+            results = await tqdm.gather(*tasks, desc="Querying UniProt")
 
-            for uid, payload in await tqdm_asyncio.gather(*tasks, total=len(tasks)):
-                results[uid] = payload
-
-        return results
+        output = {uid: payload for item in results if item for uid, payload in (item,)}
+        return output
 
     def run_async_query_uniprot_names_and_functions(
         self, uniprot_ids: List[str], workers: int = 5
