@@ -947,8 +947,26 @@ class CacheManager(CacheHelper):
         self.save_pickle(existing_data, self.COMBINED_GENE_CACHE_F_NAME)
 
     def _cache_pubmed_metadata(self, **kwargs):
-        print("Generating PMID data...")
-        pass
+        print("\n---Caching PubMed Metadata---")
+        pmids = kwargs.get("pmids", [])
+        if not pmids:
+            return
+
+        existing_data = self.load_pickle("gmmad2_pubmed_metadata.pkl") or {}
+        pmids_to_query = [pmid for pmid in pmids if pmid not in existing_data]
+        if not pmids_to_query:
+            print("All requested PMIDs are already in the cache.")
+            return
+
+        pubmed_service = PubMedService()
+        new_pubmed_metadata = pubmed_service.query_pubmed_metadata(pmids=pmids_to_query)
+
+        if not new_pubmed_metadata:
+            print("-> API query did not return any new metadata.")
+            return
+        print(f"Received {len(new_pubmed_metadata)} new PubMed entries to cache.")
+        existing_data.update(new_pubmed_metadata)
+        self.save_pickle(existing_data, "gmmad2_pubmed_metadata.pkl")
 
 
 class CombinedCacheManager(CacheHelper):
@@ -1090,6 +1108,21 @@ class DataCachePipeline:
         else:
             print("Gene and protein info cache is empty or could not be loaded.")
 
+    def _cache_pubmed_metadata(self):
+        pmids = [
+            line[21]
+            for line in self.csv_parser.line_generator(self.mege_path)
+            if line[21] and line[21] != "Not available"
+        ]
+        self.cache_manager.cache_entity("pubmed_metadata", pmids=pmids)
+
+    def _verify_pubmed_metadata_cache(self):
+        pubmed_metadata = self.cache_manager.load_pickle("gmmad2_pubmed_metadata.pkl")
+        if pubmed_metadata:
+            print(f"PubMed metadata cache contains {len(pubmed_metadata.keys())} unique PMIDs.")
+        else:
+            print("PubMed metadata cache is empty or could not be loaded.")
+
     def run_cache_pipeline(self):
         print("Running data cache pipeline...")
         self._cache_midi_taxon_info()
@@ -1097,6 +1130,7 @@ class DataCachePipeline:
         self._cache_mime_pubchem_descriptions()
         self._cache_mege_pubchem_descriptions()
         self._cache_mege_gene_and_protein_info()
+        self._cache_pubmed_metadata()
 
         self._update_taxon_info()
         self._update_taxon_info_with_ncit_descriptions()
@@ -1104,6 +1138,7 @@ class DataCachePipeline:
         self._verify_taxon_info_cache()
         self._verify_pubchem_cache()
         self._verify_gene_and_protein_info_cache()
+        self._verify_pubmed_metadata_cache()
 
 
 class ParserHelper:
