@@ -18,7 +18,7 @@ import requests
 from Bio import Entrez
 from dotenv import load_dotenv
 from ete3 import NCBITaxa
-from tqdm.asyncio import tqdm_asyncio
+from tqdm.asyncio import tqdm, tqdm_asyncio
 
 
 class CSVParser:
@@ -275,7 +275,7 @@ class NCITTaxonomyService:
             tasks = [
                 self.async_query_ncit_taxon_description(session, name, sem) for name in unique_names
             ]
-            results = await asyncio.gather(*tasks)
+            results = await tqdm.gather(*tasks, desc="Querying NCIT Descriptions")
         return {name: data for item in results if item for name, data in (item,)}
 
     def run_async_query_ncit_taxon_descriptions(self, taxon_names):
@@ -284,7 +284,7 @@ class NCITTaxonomyService:
         :param taxon_names:
         :return:
         {
-           "550":{
+           "enterobacter cloacae":{
               "query":"550",
               "_id":"550",
               "_version":1,
