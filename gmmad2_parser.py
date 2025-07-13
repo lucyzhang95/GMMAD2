@@ -477,17 +477,40 @@ class BiGGParser:
 
 
 class ChemPropertyUtils:
-    def bt_get_mw_logp(self, pubchem_cids):
-        # TODO: compute molecular weight, logP
-        pass
+    def query_mw_and_xlogp_from_biothings(self, cids: list):
+        cids = sorted(set(cids))
+        t = bt.get_client("chem")
+        get_chem = t.querymany(
+            cids,
+            scopes="pubchem.cid",
+            fields=["pubchem.molecular_weight", "pubchem.monoisotopic_weight", "pubchem.xlogp"],
+        )
 
-    def get_organism_type(self, node):
-        # TODO: determine organism type
-        pass
+        q_out = {}
+        for q in get_chem:
+            if "notfound" in q:
+                continue
 
-    def get_suffix(self, identifier):
-        # TODO: parse identifier suffix
-        pass
+            pub = q.get("pubchem")
+            if isinstance(pub, list):
+                info = pub[0]
+            elif isinstance(pub, dict):
+                info = pub
+            else:
+                continue
+
+            mw = info.get("molecular_weight")
+            mono = info.get("monoisotopic_weight")
+            logp = info.get("xlogp")
+            q_out[q["query"]] = {
+                "molecular_weight": {
+                    "average_molecular_weight": mw,
+                    "monoisotopic_molecular_weight": mono,
+                },
+                "xlogp": logp,
+            }
+
+        return q_out
 
 
 class CacheHelper:
