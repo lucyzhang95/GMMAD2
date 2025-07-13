@@ -172,6 +172,7 @@ class NCBITaxonomyService:
 
 class NCITTaxonomyService:
     """NCIT-based organism mappings and descriptions."""
+
     load_dotenv()
 
     def __init__(self):
@@ -326,6 +327,7 @@ class PubChemService:
         delay: float = 1.0,
     ):
         url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/{cid}/JSON"
+        data = {}
         for attempt in range(max_retries):
             async with sem:
                 try:
@@ -334,11 +336,17 @@ class PubChemService:
                         data = await resp.json()
                     break
                 except aiohttp.ClientError as e:
+                    print(
+                        f"Warning: Description query for pubchem_cid: {cid} failed on attempt {attempt + 1}. Error: {e}"
+                    )
                     if attempt < max_retries - 1:
                         await asyncio.sleep(delay * (2**attempt))
                         continue
                     else:
-                        raise e
+                        print(f"Error: All retries failed for querying pubchem_cid: {cid}.")
+                        return None
+        if not data:
+            return None
 
         description = None
         synonyms = []
@@ -374,42 +382,30 @@ class PubChemService:
             "synonyms": synonyms,
         }
 
-    async def async_query_pubchem_descriptions(
+    async def async_query_pug_pubchem_descriptions(
         self,
         cids: List[int],
         workers: int = 5,
     ) -> Dict[int, Dict[str, str]]:
-        cids = list(set(cids))
+        """Queries PubChem for descriptions of a list of compound IDs (CIDs)."""
 
-        workers = min(workers, 5)
+        unique_cids = sorted(list(set(cids)))
         sem = asyncio.Semaphore(workers)
         connector = aiohttp.TCPConnector(limit_per_host=workers)
-        cids = sorted(list(set(cids)))
 
-        results = {}
         async with aiohttp.ClientSession(connector=connector) as session:
-            tasks = []
-            last_launch = 0.0
+            tasks = [
+                self.async_query_pug_pubchem_description(session, cid, sem) for cid in unique_cids
+            ]
 
-            for cid in cids:
-                elapsed = time.perf_counter() - last_launch
-                if elapsed < 1.0 / 5:
-                    await asyncio.sleep(1.0 / 5 - elapsed)
-                last_launch = time.perf_counter()
+            print(f"Querying PubChem for {len(unique_cids)} CIDs...")
+            results = await tqdm.gather(*tasks, desc="Querying PubChem Metabolite Descriptions")
+        output = {cid: payload for item in results if item for cid, payload in (item,)}
 
-                task = asyncio.create_task(
-                    self.async_query_pug_pubchem_description(cid, session, sem)
-                )
-                tasks.append(task)
+        return output
 
-            for cid, payload in await tqdm_asyncio.gather(*tasks, total=len(tasks)):
-                if payload:
-                    results[cid] = payload
-
-        return results
-
-    def run_async_query_pubchem_descriptions(self, cids: List[int], workers: int = 5):
-        return asyncio.run(self.async_query_pubchem_descriptions(cids, workers))
+    def run_async_query_pug_pubchem_descriptions(self, cids: List[int], workers: int = 5):
+        return asyncio.run(self.async_query_pug_pubchem_descriptions(cids, workers))
 
 
 class UniProtService:
