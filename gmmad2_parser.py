@@ -595,7 +595,7 @@ class PubMedService:
         handle.close()
 
         result = {}
-        for article in records["PubmedArticle"]:
+        for article in tqdm(records["PubmedArticle"], desc="Processing PubMed Articles"):
             try:
                 pmid = str(article["MedlineCitation"]["PMID"])
                 article_data = article["MedlineCitation"]["Article"]
