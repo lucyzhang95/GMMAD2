@@ -262,7 +262,7 @@ class NCITTaxonomyService:
     async def async_query_ncit_taxon_descriptions(
         self, taxon_names, max_concurrent=5
     ) -> dict[str, dict]:
-        unique_names = sorted({n.lower() for n in taxon_names})
+        unique_names = sorted(list(set(n.lower() for n in taxon_names)))
         print(
             f"(NCIt BioPortal Call) Querying for {len(unique_names)} taxon names: {unique_names[:5]}..."
         )
@@ -815,24 +815,56 @@ class CacheManager(CacheHelper):
         main_taxon_info_cache.update(new_taxon_info_to_add)
         self.save_pickle(main_taxon_info_cache, main_cache_f_name)
 
-    def _cache_taxon_description(self, **kwargs):
+    def update_taxon_info_with_descriptions(self):
+        """
+        Loads the main taxon info cache, finds entries missing a description,
+        queries for them, and saves the updated data back to the same file.
+        """
+        print("\n---Updating taxon info with NCIT descriptions---")
+
+        taxon_info_f_name = "gmmad2_taxon_info.pkl"
+        taxon_info_cache = self.load_pickle(taxon_info_f_name)
+
+        if not taxon_info_cache:
+            print("Main taxon info cache not found. Cannot update.")
+            return
+
+        names_to_query = []
+        name_to_taxid_map = {}
+
+        for taxid, info in taxon_info_cache.items():
+            if "description" not in info or not info.get("description"):
+                if "scientific_name" in info:
+                    name = info["scientific_name"]
+                    names_to_query.append(name)
+                    if name not in name_to_taxid_map:
+                        name_to_taxid_map[name] = []
+                    name_to_taxid_map[name].append(taxid)
+
+        if not names_to_query:
+            print("All taxon entries already have descriptions.")
+            return
+
         ncit_service = NCITTaxonomyService()
-
-        taxon_names = kwargs.get("taxon_names", [])
-        if not taxon_names:
-            return None
-
-        f_name = "gmmad2_taxon_description.pkl"
-        existing_data = self.load_pickle(f_name) or {}
-        taxon_names_to_query = [tname for tname in taxon_names if tname not in existing_data]
-        if not taxon_names_to_query:
-            print("All requested taxon names are already in the cache.")
-            return None
-
-        new_taxon_desc = ncit_service.run_async_query_ncit_taxon_descriptions(
-            taxon_names=taxon_names_to_query
+        unique_names_to_query = names_to_query
+        taxon_descs = ncit_service.run_async_query_ncit_taxon_descriptions(
+            taxon_names=unique_names_to_query
         )
-        return new_taxon_desc
+
+        if not taxon_descs:
+            print("-> No new descriptions were found by the NCIt service.")
+            return
+
+        update_count = 0
+        for name, desc in taxon_descs.items():
+            if name in name_to_taxid_map:
+                for taxid in name_to_taxid_map[name]:
+                    taxon_info_cache[taxid]["description"] = desc
+                    update_count += 1
+        print(
+            f"Found and added descriptions for {len(taxon_descs)} unique names, updating {update_count} entries."
+        )
+        self.save_pickle(taxon_info_cache, taxon_info_f_name)
 
     def _cache_pubchem_description(self, **kwargs):
         print("Generating PubChem descriptions...")
@@ -948,8 +980,6 @@ class DataCachePipeline:
         self._cache_mime_taxon_info()
         self._update_taxon_info()
         self._verify_taxon_info_cache()
-
-
 
 
 class ParserHelper:
