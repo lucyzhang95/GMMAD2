@@ -900,6 +900,55 @@ class CombinedCacheManager(CacheHelper):
         self.save_pickle(data, f"{relationship_name}.pkl")
 
 
+class DataCachePipeline:
+    def __init__(self, cache_dir="cache", downloads_dir="downloads"):
+        self.downloads_dir = downloads_dir
+        self.cache_dir = cache_dir
+        self.midi_path = os.path.join(self.downloads_dir, "disease_species.csv")
+        self.mime_path = os.path.join(self.downloads_dir, "micro_metabolic.csv")
+        self.mege_path = os.path.join(self.downloads_dir, "meta_gene_net.csv")
+        self.csv_parser = CSVParser()
+        self.cache_manager = CacheManager(cache_dir=self.cache_dir)
+        print("Data Cache Pipeline initialized...")
+
+    def _cache_midi_taxon_info(self):
+        taxids = [
+            line[5] for line in self.csv_parser.line_generator_for_microbe_disease(self.midi_path)
+        ]
+        self.cache_manager.cache_entity("taxon_info", taxids=taxids)
+
+    def _cache_mime_taxon_info(self):
+        taxids = [
+            line[9]
+            if (line[9] and line[9] != "not available")
+            else line[16]
+            if (line[16] and line[16] != "not available")
+            else None
+            for line in self.csv_parser.line_generator(self.mime_path)
+        ]
+        taxids = [t for t in taxids if t]
+        self.cache_manager.cache_entity("taxon_info", taxids=taxids)
+
+    def _update_taxon_info(self):
+        self.cache_manager.update_taxon_info_with_current_taxids()
+
+    def _verify_taxon_info_cache(self):
+        taxon_info_cache = self.cache_manager.load_pickle("gmmad2_taxon_info.pkl")
+        if taxon_info_cache:
+            print(f"Final cache contains {len(taxon_info_cache.keys())} unique taxids.")
+        else:
+            print("Final cache is empty or could not be loaded.")
+
+    def run_cache_pipeline(self):
+        print("Running data cache pipeline...")
+        self._cache_midi_taxon_info()
+        self._cache_mime_taxon_info()
+        self._update_taxon_info()
+        self._verify_taxon_info_cache()
+
+
+
+
 class ParserHelper:
     def get_organism_type(self, node) -> str:
         """
@@ -1081,39 +1130,5 @@ class DataLoader:
 
 
 if __name__ == "__main__":
-    csv_parser = CSVParser()
-    cache_manager = CacheManager()
-    ncbi_svc = NCBITaxonomyService()
-
-    print("\n--- FIRST RUN: Caching initial set of taxids ---")
-    midi_path = os.path.join("downloads", "disease_species.csv")
-    midi_taxids = [line[5] for line in csv_parser.line_generator_for_microbe_disease(midi_path)]
-    cache_manager.cache_entity("taxon_info", taxids=midi_taxids)
-
-    print("\n\n--- SECOND RUN: Caching an overlapping set of taxids ---")
-    mime_path = os.path.join("downloads", "micro_metabolic.csv")
-    mime_taxids = taxids = [
-        line[9]
-        if (line[9] and line[9] != "not available")
-        else line[16]
-        if (line[16] and line[16] != "not available")
-        else None
-        for line in csv_parser.line_generator(mime_path)
-    ]
-    mime_taxids = [t for t in mime_taxids if t]
-    cache_manager.cache_entity("taxon_info", taxids=mime_taxids)
-
-    taxid_not_found = cache_manager.load_pickle("gmmad2_taxon_info_notfound.pkl")
-    print(f"\n'Taxid Not Found' cache contains {len(taxid_not_found)} unfound taxids:")
-    print(taxid_not_found)
-
-    print("\n\n--- THIRD RUN: Caching a new mapped set of taxids ---")
-    # taxid_map = ncbi_svc.get_taxid_mapping_from_ncbi_merged_dmp()
-    # new_taxid_map = ncbi_svc.get_current_taxid_mapping(taxid_not_found, taxid_map)
-    # new_taxids = [new_taxid for new_taxid in new_taxid_map.values() if new_taxid is not None]
-    # cache_manager.cache_entity("taxon_info", taxids=new_taxids)
-    cache_manager.update_taxon_info_with_current_taxids()
-
-    print("\n\n--- VERIFICATION ---")
-    final_cache = cache_manager.load_pickle("gmmad2_taxon_info.pkl")
-    print(f"Final cache contains {len(final_cache.keys())} unique taxids.")
+    cache_pipline = DataCachePipeline()
+    cache_pipline.run_cache_pipeline()
