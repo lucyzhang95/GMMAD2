@@ -170,7 +170,7 @@ class NCBITaxonomyService:
         return list(taxon_names)
 
 
-class NCITTaxonomyService:
+class NCItTaxonomyService:
     """NCIT-based organism mappings and descriptions."""
 
     load_dotenv()
@@ -833,7 +833,7 @@ class CacheManager(CacheHelper):
         names_to_query = sorted([name for name in names_need_desc if name not in desc_cache])
 
         if names_to_query:
-            ncit_service = NCITTaxonomyService()
+            ncit_service = NCItTaxonomyService()
             new_descriptions = ncit_service.run_async_query_ncit_taxon_descriptions(
                 taxon_names=names_to_query
             )
@@ -1167,7 +1167,7 @@ class GMMAD2Parser:
         csv_parser: CSVParser,
         cache_mgr: CacheManager,
         taxonomy_svc: NCBITaxonomyService,
-        ncit_svc: NCITTaxonomyService,
+        ncit_svc: NCItTaxonomyService,
         parser_helpers: ParserHelper,
     ):
         load_dotenv()
