@@ -1200,8 +1200,8 @@ class DataCachePipeline:
         self._cache_mime_chem_properties()
         self._cache_mege_chem_properties()
 
-        self._update_taxon_info()
-        self._update_taxon_info_with_ncit_descriptions()
+        # self._update_taxon_info()
+        # self._update_taxon_info_with_ncit_descriptions()
 
         self._verify_taxon_info_cache()
         self._verify_pubchem_cache()
@@ -1340,7 +1340,7 @@ class ParserHelper:
         return obj
 
 
-class GMMAD2Parser:
+class GMMAD2Parser(CacheHelper):
     """
     Parses and merges microbe-disease, microbe-metabolite,
     metabolite-gene associations.
@@ -1349,21 +1349,100 @@ class GMMAD2Parser:
     def __init__(
         self,
         csv_parser: CSVParser,
-        cache_mgr: CacheManager,
-        taxonomy_svc: NCBITaxonomyService,
-        ncit_svc: NCItTaxonomyService,
+        cache_pipeline: DataCachePipeline,
         parser_helpers: ParserHelper,
+        cache_dir = "cache",
+        downloads_dir = "downloads",
     ):
-        load_dotenv()
-        self.csv = csv_parser
-        self.cache = cache_mgr
-        self.taxonomy = taxonomy_svc
-        self.ncit = ncit_svc
+        super().__init__(cache_dir) # inherit from CacheHelper
+        self.csv_parser = csv_parser
+        self.cache_pipeline = cache_pipeline
         self.parser_helpers = parser_helpers
 
-    def parse_microbe_disease(self, in_file):
-        # TODO: implement parsing
-        pass
+        self.midi_path = os.path.join(downloads_dir, "disease_species.csv")
+        self.mime_path = os.path.join(downloads_dir, "micro_metabolic.csv")
+        self.mege_path = os.path.join(downloads_dir, "meta_gene_net.csv")
+
+    def parse_microbe_disease(self):
+        required_cache_f_name = "gmmad2_taxon_info.pkl"
+        if not os.path.exists(self._get_path(required_cache_f_name)):
+            print(f"'{required_cache_f_name}' not found. Running cache pipeline...")
+            self.cache_pipeline.run_cache_pipeline()
+
+        taxon_info = self.load_pickle(required_cache_f_name)
+        for line in self.csv_parser.line_generator_for_microbe_disease(self.midi_path):
+            subject_node = {}
+
+            object_node = {
+                "id": f"MESH:{line[1]}",
+                "name": line[2].lower(),
+                "type": "biolink:Disease",
+                "description": line[18],
+                "xrefs": {"mesh": f"MESH:{line[1]}"},
+            }
+            object_node = self.parser_helpers.remove_empty_none_values(object_node)
+
+            taxid = line[5]
+            if taxid in taxon_info:
+                info = taxon_info[taxid]
+                subject_node = {
+                    "id": f"NCBITaxon:{info.get('_id')}",
+                    "taxid": int(info.get("_id")) if info.get("_id") else None,
+                    "name": info.get("scientific_name", "").lower(),
+                    "original_name": line[3].lower(),
+                    "description": info.get("description"),
+                    "parent_taxid": info.get("parent_taxid"),
+                    "lineage": info.get("lineage", []),
+                    "rank": info.get("rank"),
+                    "type": "biolink:OrganismTaxon",
+                    "organism_type": None,
+                    "xrefs": info.get("xrefs", {}),
+                }
+                subject_node["organism_type"] = self.parser_helpers.get_organism_type(subject_node)
+                subject_node = self.parser_helpers.remove_empty_none_values(subject_node)
+            else:
+                subject_node["id"] = line[5] if line[5]
+                subject_node["original_name"] = line[3].lower(),
+                subject_node["type"] = "biolink:OrganismTaxon",
+
+
+
+            association_node = {
+                "predicate": "OrganismalEntityAsAModelOfDiseaseAssociation",
+                "type": "biolink:associated_with",
+                "qualifier": line[17].lower(),
+                "qualifier_ratio": float(line[16]) if line[16] else None,
+                "disease_sample_size": int(line[6]) if line[6] else None,
+                "disease_abundance_mean": float(line[7]) if line[7] else None,
+                "disease_abundance_median": float(line[8]) if line[8] else None,
+                "disease_abundance_sd": float(line[9]) if line[9] else None,
+                "control_id": line[10],
+                "control_name": line[11].lower(),
+                "healthy_sample_size": int(line[12]) if line[12] else None,
+                "healthy_abundance_mean": float(line[13]) if line[13] else None,
+                "healthy_abundance_median": float(line[14]) if line[14] else None,
+                "healthy_abundance_sd": float(line[15]) if line[15] else None,
+                "primary_knowledge_source": "infores:GMrepo",
+                "aggregator_knowledge_source": "infores:GMMAD2",
+                "evidence_type": "ECO:0000221",
+            }
+            association_node = self.parser_helpers.remove_empty_none_values(association_node)
+
+            yield {
+                "_id": f"{subject_node.get('id', 'unknown').split(':')[1]}_associated_with_{object_node.get('id', 'unknown').split(':')[1]}",
+                "association": association_node,
+                "object": object_node,
+                "subject": subject_node,
+            }
+
+
+
+
+
+
+
+
+
 
     def parse_microbe_metabolite(self, in_file):
         # TODO: implement parsing
