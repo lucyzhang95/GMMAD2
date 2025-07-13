@@ -758,44 +758,59 @@ class CacheManager(CacheHelper):
         print("\n---Updating cache with re-mapped taxids---")
 
         notfound_f_name = "gmmad2_taxon_info_notfound.pkl"
-        taxid_not_found = self.load_pickle(notfound_f_name) or []
-        if not taxid_not_found:
-            print("No 'not found' taxids to process.")
+        main_cache_f_name = "gmmad2_taxon_info.pkl"
+        taxid_notfound = self.load_pickle(notfound_f_name) or []
+        main_taxon_info_cache = self.load_pickle(main_cache_f_name) or {}
+
+        old_taxids_to_process = [tid for tid in taxid_notfound if tid not in main_taxon_info_cache]
+        if not old_taxids_to_process:
+            print("All 'not found' taxids are already in the cache.")
             return
 
         ncbi_service = NCBITaxonomyService()
         taxid_map = ncbi_service.get_taxid_mapping_from_ncbi_merged_dmp()
-        if not taxid_map:
-            print("Could not load the taxid mapping. Aborting update.")
-            return
-
         new_taxid_map = ncbi_service.get_current_taxid_mapping(
-            old_taxids=taxid_not_found, merged_mapping=taxid_map
+            old_taxids=old_taxids_to_process, merged_mapping=taxid_map
         )
-        new_taxids = [new_id for new_id in new_taxid_map.values() if new_id]
-        if not new_taxids:
-            print("No new mappings found for the 'not found' taxids.")
+
+        # remap old taxids to existing taxon info with the new taxids
+        # "93930" is in taxid_notfound, "93930" -> "93929" is already in main_taxon_info_cache
+        # reverse map "93930" to the taxon info of "93929"
+        info_to_add_from_remap = {}
+        new_taxids_to_query = []
+        for old_id, new_id in new_taxid_map.items():
+            if not new_id:
+                continue
+            if new_id in main_taxon_info_cache:
+                print(f"-> Remapping old ID '{old_id}' to existing data for new ID '{new_id}'.")
+                info_to_add_from_remap[old_id] = main_taxon_info_cache[new_id]
+            else:
+                new_taxids_to_query.append(new_id)
+
+        new_taxon_info_to_add = {}  # new taxids after remapping
+        if new_taxids_to_query:
+            new_taxon_info = ncbi_service.query_taxon_info_from_biothings(
+                taxids=new_taxids_to_query
+            )
+            valid_new_taxon_info, _ = ncbi_service.filter_taxon_info(new_taxon_info)
+
+            reverse_map = {v: k for k, v in new_taxid_map.items()}
+            for new_id, new_info in valid_new_taxon_info.items():
+                old_id = reverse_map.get(new_id)
+                if old_id:
+                    new_taxon_info_to_add[old_id] = new_info
+                new_taxon_info_to_add[new_id] = new_info
+
+        if not info_to_add_from_remap and not new_taxon_info_to_add:
+            print("No new information to add to the cache.")
             return
 
-        main_cache_f_name = "gmmad2_taxon_info.pkl"
-        main_cache_data = self.load_pickle(main_cache_f_name) or {}
-
-        new_taxids_to_query = [tid for tid in new_taxids if tid not in main_cache_data]
-        if not new_taxids_to_query:
-            print("The mapped taxids were already present in the main taxon info cache.")
-            return
-        new_taxon_info = ncbi_service.query_taxon_info_from_biothings(taxids=new_taxids_to_query)
-
-        new_info_to_add, _ = ncbi_service.filter_taxon_info(new_taxon_info)
-
-        if not new_info_to_add:
-            print("-> BioThings API query for new taxids returned no valid data.")
-            return
         print(
-            f"Adding {len(new_info_to_add)} newly queried taxon info to the main taxon info cache."
+            f"Adding {len(info_to_add_from_remap) + len(new_taxon_info_to_add)} new/remapped entries to the main cache."
         )
-        main_cache_data.update(new_info_to_add)
-        self.save_pickle(main_cache_data, main_cache_f_name)
+        main_taxon_info_cache.update(info_to_add_from_remap)
+        main_taxon_info_cache.update(new_taxon_info_to_add)
+        self.save_pickle(main_taxon_info_cache, main_cache_f_name)
 
     def _cache_taxon_description(self, **kwargs):
         ncit_service = NCITTaxonomyService()
