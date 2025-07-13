@@ -724,8 +724,6 @@ class CacheManager(CacheHelper):
 
     # TODO: Need further detailed implementations for each caching method
     def _cache_taxon_info(self, **kwargs):
-        ncbi_service = NCBITaxonomyService()
-
         taxids = kwargs.get("taxids", [])
         if not taxids:
             return None
@@ -737,8 +735,16 @@ class CacheManager(CacheHelper):
             print("All requested taxids are already in the cache.")
             return None
 
+        ncbi_service = NCBITaxonomyService()
         taxon_info = ncbi_service.query_taxon_info_from_biothings(taxids=taxids_to_query)
-        filtered_taxon_info = ncbi_service.filter_taxon_info(taxon_info)
+        filtered_taxon_info, taxid_notfound = ncbi_service.filter_taxon_info(taxon_info)
+
+        if taxid_notfound:
+            print(f"Found {len(taxid_notfound)} taxids that were not found: {taxid_notfound[:5]}")
+            notfound_f_name = "gmmad2_taxon_info_notfound.pkl"
+            existing_notfound = self.load_pickle(notfound_f_name) or []
+            updated_notfound = sorted(list(set(existing_notfound + taxid_notfound)))
+            self.save_pickle(updated_notfound, notfound_f_name)
 
         return filtered_taxon_info
 
@@ -1036,3 +1042,9 @@ if __name__ == "__main__":
     final_cache = manager.load_pickle("gmmad2_taxon_info.pkl")
     print("Final cache contains all unique taxids:")
     print(len(final_cache.keys()))
+
+    taxid_not_found = manager.load_pickle("gmmad2_taxon_info_notfound.pkl")
+    print(f"\n'Taxid Not Found' cache contains {len(taxid_not_found)} unfound taxids:")
+    print(taxid_not_found)
+
+
