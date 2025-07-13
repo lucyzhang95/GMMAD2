@@ -689,6 +689,7 @@ class CacheManager(CacheHelper):
     def __init__(self, cache_dir=None):
         """Initializes the CacheManager and ensures the cache directory exists."""
         super().__init__(cache_dir)
+        self.COMBINED_GENE_CACHE_F_NAME = "gmmad2_protein_gene_combined_info.pkl"
 
     def cache_entity(self, entity_type: str, **kwargs):
         """
@@ -901,84 +902,49 @@ class CacheManager(CacheHelper):
         pass
 
     def _cache_uniprot_info(self, **kwargs):
+        print("\n---Caching UniProt Information---")
         uniprot_ids = kwargs.get("uniprots", [])
         if not uniprot_ids:
             return
-        f_name = "gmmad2_protein_descriptions.pkl"
-        existing_data = self.load_pickle(f_name) or {}
+        existing_data = self.load_pickle(self.COMBINED_GENE_CACHE_F_NAME) or {}
         uids_to_query = [uid for uid in uniprot_ids if uid not in existing_data]
         if not uids_to_query:
             print("All requested uniprot ids are already in the cache.")
             return
 
         uniprot_service = UniProtService()
-        protein_desc = uniprot_service.run_async_query_uniprot_names_and_functions(
+        new_protein_info = uniprot_service.run_async_query_uniprot_names_and_functions(
             uniprot_ids=uids_to_query
         )
 
-        if not protein_desc:
+        if not new_protein_info:
             print("-> API query did not return any new descriptions.")
             return
-        print(f"Received {len(protein_desc)} new Uniprot information to cache.")
-        existing_data.update(protein_desc)
-
-        self.save_pickle(existing_data, f_name)
+        print(f"Received {len(new_protein_info)} new Uniprot entires to cache.")
+        existing_data.update(new_protein_info)
+        self.save_pickle(existing_data, self.COMBINED_GENE_CACHE_F_NAME)
 
     def _cache_gene_info(self, **kwargs):
+        print("\n---Caching Gene Information---")
         gene_ids = kwargs.get("gene_ids", [])
         if not gene_ids:
             return
-        f_name = "gmmad2_gene_descriptions.pkl"
-        existing_data = self.load_pickle(f_name) or {}
+
+        existing_data = self.load_pickle(self.COMBINED_GENE_CACHE_F_NAME) or {}
         gids_to_query = [gid for gid in gene_ids if gid not in existing_data]
         if not gids_to_query:
             print("All requested gene ids are already in the cache.")
             return
 
         go_service = GeneOntologyService()
-        gene_desc = go_service.query_gene_name_from_biothings(gene_ids=gids_to_query)
+        new_gene_info = go_service.query_gene_name_from_biothings(gene_ids=gids_to_query)
 
-        if not gene_desc:
+        if not new_gene_info:
             print("-> API query did not return any new descriptions.")
             return
-        print(f"Received {len(gene_desc)} new Gene descriptions to cache.")
-        existing_data.update(gene_desc)
-
-        self.save_pickle(existing_data, f_name)
-
-    def cache_protein_and_gene_info(self):
-        print("\n---Combining Protein and Gene Information---")
-
-        protein_f_name = "gmmad2_protein_descriptions.pkl"
-        gene_f_name = "gmmad2_gene_descriptions.pkl"
-        combined_f_name = "gmmad2_protein_gene_combined_descriptions.pkl"
-
-        protein_data = self.load_pickle(protein_f_name) or {}
-        gene_data = self.load_pickle(gene_f_name) or {}
-        combined_data_existing = self.load_pickle(combined_f_name)
-
-        combined_data_new = protein_data.copy()
-        combined_data_new.update(gene_data)
-
-        if not protein_data and not gene_data:
-            print("Both protein and gene caches are empty. Cannot combine.")
-            return
-
-        print(f"-> Loaded {len(protein_data)} protein entries and {len(gene_data)} gene entries.")
-        if combined_data_existing == combined_data_new:
-            print("Combined protein and gene cache is already up-to-date.")
-            return
-
-        if not combined_data_new:
-            print("Both source caches are empty. Nothing to combine.")
-            return
-        print(
-            f"-> Source data has changed. Rebuilding combined cache with {len(combined_data_new)} total entries."
-        )
-        print(
-            f"Combined data into a single dictionary with {len(combined_data_new)} total entries."
-        )
-        self.save_pickle(combined_data_new, combined_f_name)
+        print(f"Received {len(new_gene_info)} new Gene descriptions to cache.")
+        existing_data.update(new_gene_info)
+        self.save_pickle(existing_data, self.COMBINED_GENE_CACHE_F_NAME)
 
     def _cache_pubmed_metadata(self, **kwargs):
         print("Generating PMID data...")
@@ -1112,9 +1078,26 @@ class DataCachePipeline:
         ensembl_gene_ids = [_id for _id in gene_ids if "ENSG" in _id]
         self.cache_manager.cache_entity("uniprot_info", uniprots=uniprot_ids)
         self.cache_manager.cache_entity("gene_info", gene_ids=ensembl_gene_ids)
-        self.cache_manager.cache_protein_and_gene_info()
 
+    def _verify_gene_and_protein_info_cache(self):
+        protein_cache = self.cache_manager.load_pickle("gmmad2_protein_descriptions.pkl")
+        gene_cache = self.cache_manager.load_pickle("gmmad2_gene_descriptions.pkl")
+        combined_cache = self.cache_manager.load_pickle(
+            "gmmad2_protein_gene_combined_descriptions.pkl"
+        )
 
+        if protein_cache:
+            print(f"Protein cache contains {len(protein_cache.keys())} unique entries.")
+        else:
+            print("Protein cache is empty or could not be loaded.")
+        if gene_cache:
+            print(f"Gene cache contains {len(gene_cache.keys())} unique entries.")
+        else:
+            print("Gene cache is empty or could not be loaded.")
+        if combined_cache:
+            print(f"Combined cache contains {len(combined_cache.keys())} unique entries.")
+        else:
+            print("Combined cache is empty or could not be loaded.")
 
     def run_cache_pipeline(self):
         print("Running data cache pipeline...")
