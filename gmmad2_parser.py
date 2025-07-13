@@ -759,7 +759,11 @@ class ParserHelper:
 
         return "Other"
 
+    def get_suffix(self, identifier: str) -> str:
+        return identifier.split(":", 1)[1].strip() if ":" in identifier else identifier.strip()
+
     def assign_metabolite_primary_id(self, line, bigg_map):
+        # TODO: the fields are different in microbe-metabolite and metabolite-gene
         pubchem_id = line[6]
         kegg_id = line[8]
         smiles = line[18]
@@ -806,6 +810,39 @@ class ParserHelper:
                 key = "bigg"
             else:
                 continue
+
+            if primary_id is None:
+                primary_id = curie
+            xrefs.setdefault(key, curie)
+
+        return primary_id, xrefs
+
+    def assign_primary_gene_id(line):
+        ensembl_id = line[13]
+        ncbi_id = line[14]
+        hgnc_id = line[15]
+        uniprotkb = line[16]
+
+        # (line, prefix) pairs for ID hierarchy
+        id_hierarchy = [
+            (uniprotkb, "UniProtKB"),
+            (ensembl_id, "ENSEMBL"),
+            (ncbi_id, "NCBIGene"),
+            (hgnc_id, "HGNC"),
+        ]
+
+        xrefs = {}
+        primary_id = None
+
+        for val, prefix in id_hierarchy:
+            if not val or val.strip().lower() == "not available":
+                continue
+
+            curie = f"{prefix}:{val}" if prefix else val
+            if prefix == "NCBIGene":
+                key = "entrezgene"
+            else:
+                key = prefix.lower()
 
             if primary_id is None:
                 primary_id = curie
