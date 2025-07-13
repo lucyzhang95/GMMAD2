@@ -524,7 +524,7 @@ class GeneOntologyService:
 class BiGGParser:
     """BiGG metabolite mapping helper."""
 
-    def __init__(self, csv_parser):
+    def __init__(self):
         self.csv_parser = CSVParser()
 
     def get_bigg_metabolite_mapping(
@@ -543,7 +543,7 @@ class BiGGParser:
 
 class ChemPropertyUtils:
     def query_mw_and_xlogp_from_biothings(self, cids: list):
-        cids = sorted(set(cids))
+        cids = sorted(list(set(cids)))
         t = bt.get_client("chem")
         get_chem = t.querymany(
             cids,
@@ -894,12 +894,44 @@ class CacheManager(CacheHelper):
         self.save_pickle(existing_data, f_name)
 
     def _cache_pubchem_mw(self, **kwargs):
-        print("Generating PubChem molecular weights...")
-        pass
+        print("\n---Caching PubChem Metabolite Physical Properties---")
+        cids = kwargs.get("cids", [])
+        if not cids:
+            return
+
+        existing_data = self.load_pickle("gmmad2_pubchem_mw.pkl") or {}
+        cids_to_query = [cid for cid in cids if cid not in existing_data]
+        if not cids_to_query:
+            print("All requested pubchem_cids are already in the cache.")
+            return
+
+        chem_property_service = ChemPropertyUtils()
+        new_chem_properties = chem_property_service.query_mw_and_xlogp_from_biothings(
+            cids=cids_to_query
+        )
+        if not new_chem_properties:
+            print("-> API query did not return any new properties.")
+            return
+        print(f"Received {len(new_chem_properties)} new PubChem properties to cache.")
+        existing_data.update(new_chem_properties)
+        self.save_pickle(existing_data, "gmmad2_pubchem_mw.pkl")
 
     def _cache_bigg_mapping(self, **kwargs):
-        print("Generating BiGG mappings...")
-        pass
+        print("\n---Caching BiGG Metabolite Mapping---")
+        in_f = kwargs.get("downloads", "bigg_models_metabolites.txt")
+        if not os.path.exists(in_f):
+            print(f"BiGG mapping file '{in_f}' does not exist. Skipping caching.")
+            return
+
+        bigg_parser = BiGGParser()
+        bigg_map = bigg_parser.get_bigg_metabolite_mapping(in_f=in_f)
+
+        if not bigg_map:
+            print("No BiGG mapping data found.")
+            return
+
+        self.save_pickle(bigg_map, "gmmad2_bigg_metabolite_mapping.pkl")
+        print(f"BiGG mapping cached with {len(bigg_map)} entries.")
 
     def _cache_uniprot_info(self, **kwargs):
         print("\n---Caching UniProt Information---")
@@ -1108,7 +1140,7 @@ class DataCachePipeline:
         else:
             print("Gene and protein info cache is empty or could not be loaded.")
 
-    def _cache_pubmed_metadata(self):
+    def _cache_mege_pubmed_metadata(self):
         pmids = [
             line[21]
             for line in self.csv_parser.line_generator(self.mege_path)
@@ -1123,6 +1155,40 @@ class DataCachePipeline:
         else:
             print("PubMed metadata cache is empty or could not be loaded.")
 
+    def _cache_mime_chem_properties(self):
+        pubchem_cids = [
+            line[6]
+            for line in self.csv_parser.line_generator(self.mime_path)
+            if line[6] and line[6] != "not available"
+        ]
+        self.cache_manager.cache_entity("pubchem_mw", cids=pubchem_cids)
+
+    def _cache_mege_chem_properties(self):
+        pubchem_cids = [
+            line[3]
+            for line in self.csv_parser.line_generator(self.mege_path)
+            if line[3] and line[3] != "Not available"
+        ]
+        self.cache_manager.cache_entity("pubchem_mw", cids=pubchem_cids)
+
+    def _verify_pubchem_mw_cache(self):
+        pubchem_mw_cache = self.cache_manager.load_pickle("gmmad2_pubchem_mw.pkl")
+        if pubchem_mw_cache:
+            print(f"PubChem MW cache contains {len(pubchem_mw_cache.keys())} unique CIDs.")
+        else:
+            print("PubChem MW cache is empty or could not be loaded.")
+
+    def _cache_bigg_mapping(self):
+        bigg_parser = BiGGParser()
+        bigg_map = bigg_parser.get_bigg_metabolite_mapping(
+            in_f=os.path.join(self.downloads_dir, "bigg_models_metabolites.txt")
+        )
+        if not bigg_map:
+            print("No BiGG mapping data found.")
+            return
+        self.cache_manager.save_pickle(bigg_map, "gmmad2_bigg_metabolite_mapping.pkl")
+        print(f"BiGG mapping cached with {len(bigg_map)} entries.")
+
     def run_cache_pipeline(self):
         print("Running data cache pipeline...")
         self._cache_midi_taxon_info()
@@ -1130,7 +1196,9 @@ class DataCachePipeline:
         self._cache_mime_pubchem_descriptions()
         self._cache_mege_pubchem_descriptions()
         self._cache_mege_gene_and_protein_info()
-        self._cache_pubmed_metadata()
+        self._cache_mege_pubmed_metadata()
+        self._cache_mime_chem_properties()
+        self._cache_mege_chem_properties()
 
         self._update_taxon_info()
         self._update_taxon_info_with_ncit_descriptions()
@@ -1139,6 +1207,7 @@ class DataCachePipeline:
         self._verify_pubchem_cache()
         self._verify_gene_and_protein_info_cache()
         self._verify_pubmed_metadata_cache()
+        self._verify_pubchem_mw_cache()
 
 
 class ParserHelper:
