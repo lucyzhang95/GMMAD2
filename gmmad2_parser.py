@@ -703,7 +703,7 @@ class CacheManager(CacheHelper):
             "pubchem_description": self._cache_pubchem_description,
             "pubchem_mw": self._cache_pubchem_mw,
             "bigg_mapping": self._cache_bigg_mapping,
-            "uniprot": self._cache_uniprot,
+            "uniprot_info": self._cache_uniprot_info,
             "pubmed_metadata": self._cache_pubmed_metadata,
         }
 
@@ -981,10 +981,9 @@ class CacheManager(CacheHelper):
         )
         self.save_pickle(combined_data_new, combined_f_name)
 
-
-def _cache_pubmed_metadata(self, **kwargs):
-    print("Generating PMID data...")
-    pass
+    def _cache_pubmed_metadata(self, **kwargs):
+        print("Generating PMID data...")
+        pass
 
 
 class CombinedCacheManager(CacheHelper):
@@ -1099,6 +1098,19 @@ class DataCachePipeline:
             print(f"PubChem cache contains {len(pubchem_desc_cache.keys())} unique CIDs.")
         else:
             print("PubChem cache is empty or could not be loaded.")
+
+    def _cache_mege_uniprot_info(self):
+        gene_ids = [
+            line[16]
+            if line[16] and line[16] != "Not available"
+            else line[13]
+            if line[13] and line[13] != "Not available"
+            else None
+            for line in self.csv_parser.line_generator(self.mege_path)
+        ]
+        gene_ids = list(set(gene_ids))
+        uniprot_ids = [_id for _id in gene_ids if "ENSG" not in _id]
+        self.cache_manager.cache_entity("uniprot_info", uniprots=uniprot_ids)
 
     def run_cache_pipeline(self):
         print("Running data cache pipeline...")
