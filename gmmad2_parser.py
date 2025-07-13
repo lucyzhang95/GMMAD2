@@ -579,13 +579,16 @@ class ChemPropertyUtils:
 
 
 class PubMedService:
+    def __init__(self):
+        self.EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
+
     def query_pubmed_metadata(self, pmids):
         """Get title, DOI, and abstract for a list of pmids using Entrez.
 
         :param pmids: a list of pmids obtained from core_table.txt
         :return: a dictionary with pmid as key and a dictionary with title, abstract, and doi as value.
         """
-        Entrez.email = os.getenv("EMAIL_ADDRESS")
+        Entrez.email = self.EMAIL_ADDRESS
         pmids = set(pmids)
         handle = Entrez.efetch(db="pubmed", id=",".join(map(str, pmids)), retmode="xml")
         records = Entrez.read(handle)
