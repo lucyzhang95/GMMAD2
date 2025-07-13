@@ -863,21 +863,20 @@ class CacheManager(CacheHelper):
     def _cache_pubchem_description(self, **kwargs):
         cids = kwargs.get("cids", [])
         if not cids:
-            return None
-
+            return
         f_name = "gmmad2_pubchem_descriptions.pkl"
         existing_data = self.load_pickle(f_name) or {}
         cids_to_query = [cid for cid in cids if cid not in existing_data]
         if not cids_to_query:
             print("All requested pubchem_cids are already in the cache.")
-            return None
+            return
 
         pubchem_service = PubChemService()
-        pubchem_desc = pubchem_service.run_async_query_pug_pubchem_descriptions(cids=cids)
+        pubchem_desc = pubchem_service.run_async_query_pug_pubchem_descriptions(cids=cids_to_query)
 
         if not pubchem_desc:
             print("-> API query did not return any new descriptions.")
-            return None
+            return
         print(f"Received {len(pubchem_desc)} new PubChem descriptions to cache.")
         existing_data.update(pubchem_desc)
 
@@ -1019,7 +1018,7 @@ class DataCachePipeline:
         self._cache_mime_taxon_info()
         self._update_taxon_info()
         self._verify_taxon_info_cache()
-        # self._update_taxon_info_with_ncit_descriptions()
+        self._update_taxon_info_with_ncit_descriptions()
         self._verify_taxon_info_cache()
         self._cache_mime_pubchem_descriptions()
         self._cache_mege_pubchem_descriptions()
