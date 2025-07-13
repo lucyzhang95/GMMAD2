@@ -686,8 +686,6 @@ class CacheHelper:
 class CacheManager(CacheHelper):
     """CacheManager for managing on-disk caches and serialization."""
 
-    CACHE_FILENAME = "gmmad2_all_association_cache.pkl"
-
     def __init__(self, cache_dir=None):
         """Initializes the CacheManager and ensures the cache directory exists."""
         super().__init__(cache_dir)
@@ -699,11 +697,12 @@ class CacheManager(CacheHelper):
         """
         entity_map = {
             "taxon_info": self._cache_taxon_info,
-            "taxon_description": self._update_taxon_info_with_descriptions,
+            "taxon_description": self.update_taxon_info_with_descriptions,
             "pubchem_description": self._cache_pubchem_description,
             "pubchem_mw": self._cache_pubchem_mw,
             "bigg_mapping": self._cache_bigg_mapping,
             "uniprot_info": self._cache_uniprot_info,
+            "gene_info": self._cache_gene_info,
             "pubmed_metadata": self._cache_pubmed_metadata,
         }
 
@@ -752,7 +751,7 @@ class CacheManager(CacheHelper):
 
         return filtered_taxon_info
 
-    def _update_taxon_info_with_current_taxids(self):
+    def update_taxon_info_with_current_taxids(self):
         """
         Loads not-found taxids, finds their current IDs, queries for them,
         and updates the main taxon_info cache.
@@ -813,7 +812,7 @@ class CacheManager(CacheHelper):
         main_taxon_info_cache.update(new_taxon_info_to_add)
         self.save_pickle(main_taxon_info_cache, main_cache_f_name)
 
-    def _update_taxon_info_with_descriptions(self):
+    def update_taxon_info_with_descriptions(self):
         """
         Loads the main taxon info cache, finds entries missing a description,
         queries for them, and saves the updated data back to the same file.
@@ -947,7 +946,7 @@ class CacheManager(CacheHelper):
 
         self.save_pickle(existing_data, f_name)
 
-    def _cache_protein_and_gene_info(self):
+    def cache_protein_and_gene_info(self):
         print("\n---Combining Protein and Gene Information---")
 
         protein_f_name = "gmmad2_protein_descriptions.pkl"
@@ -1064,10 +1063,10 @@ class DataCachePipeline:
         self.cache_manager.cache_entity("taxon_info", taxids=taxids)
 
     def _update_taxon_info(self):
-        self.cache_manager._update_taxon_info_with_current_taxids()
+        self.cache_manager.update_taxon_info_with_current_taxids()
 
     def _update_taxon_info_with_ncit_descriptions(self):
-        self.cache_manager._update_taxon_info_with_descriptions()
+        self.cache_manager.update_taxon_info_with_descriptions()
 
     def _verify_taxon_info_cache(self):
         taxon_info_cache = self.cache_manager.load_pickle("gmmad2_taxon_info.pkl")
@@ -1099,7 +1098,7 @@ class DataCachePipeline:
         else:
             print("PubChem cache is empty or could not be loaded.")
 
-    def _cache_mege_uniprot_info(self):
+    def _cache_mege_gene_and_protein_info(self):
         gene_ids = [
             line[16]
             if line[16] and line[16] != "Not available"
@@ -1110,7 +1109,12 @@ class DataCachePipeline:
         ]
         gene_ids = list(set(gene_ids))
         uniprot_ids = [_id for _id in gene_ids if "ENSG" not in _id]
+        ensembl_gene_ids = [_id for _id in gene_ids if "ENSG" in _id]
         self.cache_manager.cache_entity("uniprot_info", uniprots=uniprot_ids)
+        self.cache_manager.cache_entity("gene_info", gene_ids=ensembl_gene_ids)
+        self.cache_manager.cache_protein_and_gene_info()
+
+
 
     def run_cache_pipeline(self):
         print("Running data cache pipeline...")
