@@ -501,6 +501,26 @@ class UniProtService:
         return asyncio.run(self.async_query_uniprot_names_and_functions(uniprot_ids, workers))
 
 
+class GeneOntologyService:
+    def query_gene_name_from_biothings(self, gene_ids: list) -> dict:
+        """
+        Retrieves gene names for a given list of gene IDs using biothings_client
+        The IDs are searched across multiple scopes: "ensembl.gene".
+
+        :param gene_ids: A list of gene IDs to be queried.
+        :return: A dictionary containing the gene names and associated information.
+        """
+        gene_ids = set(gene_ids)
+        t = bt.get_client("gene")
+        gene_q = t.querymany(gene_ids, scopes=["ensembl.gene"], fields=["name", "symbol"])
+        gene_names = {
+            d["query"]: {"name": d.get("symbol"), "full_name": d.get("name")}
+            for d in gene_q
+            if "notfound" not in d
+        }
+        return gene_names
+
+
 class BiGGParser:
     """BiGG metabolite mapping helper."""
 
@@ -871,7 +891,7 @@ class CacheManager(CacheHelper):
         print(f"Received {len(pubchem_desc)} new PubChem descriptions to cache.")
         existing_data.update(pubchem_desc)
 
-        self.save_pickle(pubchem_desc, f_name)
+        self.save_pickle(existing_data, f_name)
 
     def _cache_pubchem_mw(self, **kwargs):
         print("Generating PubChem molecular weights...")
@@ -881,13 +901,90 @@ class CacheManager(CacheHelper):
         print("Generating BiGG mappings...")
         pass
 
-    def _cache_uniprot(self, **kwargs):
-        print("Generating UniProt data...")
-        pass
+    def _cache_uniprot_info(self, **kwargs):
+        uniprot_ids = kwargs.get("uniprots", [])
+        if not uniprot_ids:
+            return
+        f_name = "gmmad2_protein_descriptions.pkl"
+        existing_data = self.load_pickle(f_name) or {}
+        uids_to_query = [uid for uid in uniprot_ids if uid not in existing_data]
+        if not uids_to_query:
+            print("All requested uniprot ids are already in the cache.")
+            return
 
-    def _cache_pubmed_metadata(self, **kwargs):
-        print("Generating PMID data...")
-        pass
+        uniprot_service = UniProtService()
+        protein_desc = uniprot_service.run_async_query_uniprot_names_and_functions(
+            uniprot_ids=uids_to_query
+        )
+
+        if not protein_desc:
+            print("-> API query did not return any new descriptions.")
+            return
+        print(f"Received {len(protein_desc)} new Uniprot information to cache.")
+        existing_data.update(protein_desc)
+
+        self.save_pickle(existing_data, f_name)
+
+    def _cache_gene_info(self, **kwargs):
+        gene_ids = kwargs.get("gene_ids", [])
+        if not gene_ids:
+            return
+        f_name = "gmmad2_gene_descriptions.pkl"
+        existing_data = self.load_pickle(f_name) or {}
+        gids_to_query = [gid for gid in gene_ids if gid not in existing_data]
+        if not gids_to_query:
+            print("All requested gene ids are already in the cache.")
+            return
+
+        go_service = GeneOntologyService()
+        gene_desc = go_service.query_gene_name_from_biothings(gene_ids=gids_to_query)
+
+        if not gene_desc:
+            print("-> API query did not return any new descriptions.")
+            return
+        print(f"Received {len(gene_desc)} new Gene descriptions to cache.")
+        existing_data.update(gene_desc)
+
+        self.save_pickle(existing_data, f_name)
+
+    def _cache_protein_and_gene_info(self):
+        print("\n---Combining Protein and Gene Information---")
+
+        protein_f_name = "gmmad2_protein_descriptions.pkl"
+        gene_f_name = "gmmad2_gene_descriptions.pkl"
+        combined_f_name = "gmmad2_protein_gene_combined_descriptions.pkl"
+
+        protein_data = self.load_pickle(protein_f_name) or {}
+        gene_data = self.load_pickle(gene_f_name) or {}
+        combined_data_existing = self.load_pickle(combined_f_name)
+
+        combined_data_new = protein_data.copy()
+        combined_data_new.update(gene_data)
+
+        if not protein_data and not gene_data:
+            print("Both protein and gene caches are empty. Cannot combine.")
+            return
+
+        print(f"-> Loaded {len(protein_data)} protein entries and {len(gene_data)} gene entries.")
+        if combined_data_existing == combined_data_new:
+            print("Combined protein and gene cache is already up-to-date.")
+            return
+
+        if not combined_data_new:
+            print("Both source caches are empty. Nothing to combine.")
+            return
+        print(
+            f"-> Source data has changed. Rebuilding combined cache with {len(combined_data_new)} total entries."
+        )
+        print(
+            f"Combined data into a single dictionary with {len(combined_data_new)} total entries."
+        )
+        self.save_pickle(combined_data_new, combined_f_name)
+
+
+def _cache_pubmed_metadata(self, **kwargs):
+    print("Generating PMID data...")
+    pass
 
 
 class CombinedCacheManager(CacheHelper):
