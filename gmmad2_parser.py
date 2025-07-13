@@ -713,7 +713,6 @@ class CacheManager(CacheHelper):
         else:
             print(f"-> No new data to cache for '{entity_type}'.")
 
-    # TODO: Need further detailed implementations for each caching method
     def _cache_taxon_info(self, **kwargs):
         taxids = kwargs.get("taxids", [])
         if not taxids:
@@ -808,52 +807,72 @@ class CacheManager(CacheHelper):
         """
         print("\n---Updating taxon info with NCIT descriptions---")
 
-        taxon_info_f_name = "gmmad2_taxon_info.pkl"
-        taxon_info_cache = self.load_pickle(taxon_info_f_name)
+        main_cache_f_name = "gmmad2_taxon_info.pkl"
+        desc_cache_f_name = "gmmad2_ncit_descriptions.pkl"
 
+        taxon_info_cache = self.load_pickle(main_cache_f_name)
         if not taxon_info_cache:
-            print("Main taxon info cache not found. Cannot update.")
+            print(f"Main taxon info cache not found at '{main_cache_f_name}'. Cannot update.")
             return
 
-        names_to_query = []
-        name_to_taxid_map = {}
-
-        for taxid, info in taxon_info_cache.items():
+        desc_cache = self.load_pickle(desc_cache_f_name) or {}
+        names_need_desc = set()
+        for info in taxon_info_cache.values():
             if "description" not in info or not info.get("description"):
-                if "scientific_name" in info:
-                    name = info["scientific_name"]
-                    names_to_query.append(name)
-                    if name not in name_to_taxid_map:
-                        name_to_taxid_map[name] = []
-                    name_to_taxid_map[name].append(taxid)
+                name = info["scientific_name"]
+                names_need_desc.add(name)
 
-        if not names_to_query:
+        if not names_need_desc:
             print("All taxon entries already have descriptions.")
             return
 
-        ncit_service = NCITTaxonomyService()
-        taxon_descs = ncit_service.run_async_query_ncit_taxon_descriptions(
-            taxon_names=names_to_query
-        )
+        names_to_query = sorted([name for name in names_need_desc if name not in desc_cache])
 
-        if not taxon_descs:
-            print("-> No new descriptions were found by the NCIt service.")
-            return
+        if names_to_query:
+            ncit_service = NCITTaxonomyService()
+            new_descriptions = ncit_service.run_async_query_ncit_taxon_descriptions(
+                taxon_names=names_to_query
+            )
+            if new_descriptions:
+                print(f"Found {len(new_descriptions)} new descriptions from API.")
+                desc_cache.update(new_descriptions)
+                self.save_pickle(desc_cache, desc_cache_f_name)
+        else:
+            print("All needed descriptions were already in the local description cache.")
 
         update_count = 0
-        for name, desc in taxon_descs.items():
-            if name in name_to_taxid_map:
-                for taxid in name_to_taxid_map[name]:
-                    taxon_info_cache[taxid]["description"] = desc
+        for taxid, info in taxon_info_cache.items():
+            if ("description" not in info or not info.get("description")) and info.get(
+                "scientific_name"
+            ):
+                name = info["scientific_name"]
+                if name in desc_cache:
+                    taxon_info_cache[taxid]["description"] = desc_cache[name]
                     update_count += 1
-        print(
-            f"Found and added descriptions for {len(taxon_descs)} unique names, updating {update_count} entries."
-        )
-        self.save_pickle(taxon_info_cache, taxon_info_f_name)
+        if update_count > 0:
+            print(f"Updated {update_count} entries in the main taxon info cache with descriptions.")
+            self.save_pickle(taxon_info_cache, main_cache_f_name)
+        else:
+            print("-> No entries in the main taxon info cache needed an update.")
 
     def _cache_pubchem_description(self, **kwargs):
-        print("Generating PubChem descriptions...")
-        pass
+        cids = kwargs.get("cids", [])
+        if not cids:
+            return None
+
+        f_name = "gmmad2_pubchem_descriptions.pkl"
+        existing_data = self.load_pickle(f_name) or {}
+        cids_to_query = [cid for cid in cids if cid not in existing_data]
+        if not cids_to_query:
+            print("All requested pubchem_cids are already in the cache.")
+            return None
+
+        pubchem_service = PubChemService()
+        pubchem_desc = pubchem_service.run_async_query_pug_pubchem_descriptions(cids=cids)
+
+        self.save_pickle(pubchem_desc, f_name)
+
+        return pubchem_desc
 
     def _cache_pubchem_mw(self, **kwargs):
         print("Generating PubChem molecular weights...")
@@ -962,13 +981,40 @@ class DataCachePipeline:
         else:
             print("Final cache is empty or could not be loaded.")
 
+    def _cache_mime_pubchem_descriptions(self):
+        pubchem_cids = [
+            line[6]
+            for line in self.csv_parser.line_generator(self.mime_path)
+            if line[6] and line[6] != "not available"
+        ]
+        self.cache_manager.cache_entity("pubchem_description", cids=pubchem_cids)
+
+    def _cache_mege_pubchem_descriptions(self):
+        pubchem_cids = [
+            line[3]
+            for line in self.csv_parser.line_generator(self.mege_path)
+            if line[3] and line[3] != "Not available"
+        ]
+        self.cache_manager.cache_entity("pubchem_description", cids=pubchem_cids)
+
+    def _verify_pubchem_cache(self):
+        pubchem_desc_cache = self.cache_manager.load_pickle("gmmad2_pubchem_descriptions.pkl")
+        if pubchem_desc_cache:
+            print(f"PubChem cache contains {len(pubchem_desc_cache.keys())} unique CIDs.")
+        else:
+            print("PubChem cache is empty or could not be loaded.")
+
     def run_cache_pipeline(self):
         print("Running data cache pipeline...")
         self._cache_midi_taxon_info()
         self._cache_mime_taxon_info()
         self._update_taxon_info()
+        self._verify_taxon_info_cache()
         self._update_taxon_info_with_ncit_descriptions()
         self._verify_taxon_info_cache()
+        self._cache_mime_pubchem_descriptions()
+        self._cache_mege_pubchem_descriptions()
+        self._verify_pubchem_cache()
 
 
 class ParserHelper:
