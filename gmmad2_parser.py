@@ -148,7 +148,7 @@ class NCBITaxonomyService:
         print(f"(BioThings API Call) Querying for {len(taxids)} taxids: {taxids[:5]}...")
         return taxon_info
 
-    def filter_taxon_info(self, taxon_info: list) -> dict:
+    def filter_taxon_info(self, taxon_info: list) -> dict and list:
         """
         Filters the taxon_info dictionary to remove not found entries.
 
@@ -156,7 +156,8 @@ class NCBITaxonomyService:
         :return:
         """
         taxon_info_filtered = {t["query"]: t for t in taxon_info if "notfound" not in t.keys()}
-        return taxon_info_filtered
+        taxid_notfound = set(t["query"] for t in taxon_info if "notfound" in t.keys())
+        return taxon_info_filtered, list(taxid_notfound)
 
     def fetch_taxon_names_from_taxon_info(self, taxon_info: dict) -> list[str]:
         """Extracts biothings names from the taxon_info dictionary."""
@@ -260,7 +261,9 @@ class NCITTaxonomyService:
         self, taxon_names, max_concurrent=5
     ) -> dict[str, dict]:
         unique_names = sorted({n.lower() for n in taxon_names})
-        print(f"(NCIt BioPortal Call) Querying for {len(unique_names)} taxon names: {unique_names[:5]}...")
+        print(
+            f"(NCIt BioPortal Call) Querying for {len(unique_names)} taxon names: {unique_names[:5]}..."
+        )
         sem = asyncio.Semaphore(max_concurrent)
         connector = aiohttp.TCPConnector(limit_per_host=max_concurrent)
         async with aiohttp.ClientSession(connector=connector) as session:
@@ -617,6 +620,7 @@ class PubMedService:
 
 class CacheHelper:
     """Generic on-disk cache and serialization helpers."""
+
     DEFAULT_CACHE_DIR = os.path.join(os.getcwd(), "cache")
 
     def __init__(self, cache_dir=None):
