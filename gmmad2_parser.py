@@ -513,6 +513,48 @@ class ChemPropertyUtils:
         return q_out
 
 
+class PubMedService:
+    def query_pubmed_metadata(self, pmids):
+        """Get title, DOI, and abstract for a list of pmids using Entrez.
+
+        :param pmids: a list of pmids obtained from core_table.txt
+        :return: a dictionary with pmid as key and a dictionary with title, abstract, and doi as value.
+        """
+        Entrez.email = os.getenv("EMAIL_ADDRESS")
+        pmids = set(pmids)
+        handle = Entrez.efetch(db="pubmed", id=",".join(map(str, pmids)), retmode="xml")
+        records = Entrez.read(handle)
+        handle.close()
+
+        result = {}
+        for article in records["PubmedArticle"]:
+            try:
+                pmid = str(article["MedlineCitation"]["PMID"])
+                article_data = article["MedlineCitation"]["Article"]
+
+                title = article_data.get("ArticleTitle", "")
+                abstract = ""
+                if "Abstract" in article_data:
+                    abstract_parts = article_data["Abstract"].get("AbstractText", [])
+                    abstract = " ".join(str(part) for part in abstract_parts)
+
+                doi = ""
+                elist = article.get("PubmedData", {}).get("ArticleIdList", [])
+                for el in elist:
+                    if el.attributes.get("IdType") == "doi":
+                        doi = str(el)
+                        break
+
+                result[pmid] = {
+                    "name": title,
+                    "summary": f"{abstract} [abstract]",
+                    "doi": doi,
+                }
+            except Exception as e:
+                print(f"Failed to parse article: {e}")
+        return result
+
+
 class CacheHelper:
     """Generic on-disk cache and serialization helpers."""
 
