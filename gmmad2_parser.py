@@ -259,7 +259,7 @@ class NCITTaxonomyService:
     async def async_query_ncit_taxon_descriptions(
         self, taxon_names, max_concurrent=5
     ) -> dict[str, dict]:
-        unique_names = {n.lower() for n in taxon_names}
+        unique_names = sorted({n.lower() for n in taxon_names})
         print(f"(NCIt BioPortal Call) Querying for {len(unique_names)} taxon names: {unique_names[:5]}...")
         sem = asyncio.Semaphore(max_concurrent)
         connector = aiohttp.TCPConnector(limit_per_host=max_concurrent)
