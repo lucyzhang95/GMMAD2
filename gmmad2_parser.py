@@ -1080,24 +1080,15 @@ class DataCachePipeline:
         self.cache_manager.cache_entity("gene_info", gene_ids=ensembl_gene_ids)
 
     def _verify_gene_and_protein_info_cache(self):
-        protein_cache = self.cache_manager.load_pickle("gmmad2_protein_descriptions.pkl")
-        gene_cache = self.cache_manager.load_pickle("gmmad2_gene_descriptions.pkl")
-        combined_cache = self.cache_manager.load_pickle(
-            "gmmad2_protein_gene_combined_descriptions.pkl"
+        gene_and_protein_info = self.cache_manager.load_pickle(
+            self.cache_manager.COMBINED_GENE_CACHE_F_NAME
         )
-
-        if protein_cache:
-            print(f"Protein cache contains {len(protein_cache.keys())} unique entries.")
+        if gene_and_protein_info:
+            print(
+                f"Gene and protein info cache contains {len(gene_and_protein_info.keys())} unique entries."
+            )
         else:
-            print("Protein cache is empty or could not be loaded.")
-        if gene_cache:
-            print(f"Gene cache contains {len(gene_cache.keys())} unique entries.")
-        else:
-            print("Gene cache is empty or could not be loaded.")
-        if combined_cache:
-            print(f"Combined cache contains {len(combined_cache.keys())} unique entries.")
-        else:
-            print("Combined cache is empty or could not be loaded.")
+            print("Gene and protein info cache is empty or could not be loaded.")
 
     def run_cache_pipeline(self):
         print("Running data cache pipeline...")
