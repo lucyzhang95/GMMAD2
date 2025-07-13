@@ -262,17 +262,99 @@ class NCITTaxonomyService:
 class PubChemService:
     """PubChem PUG-REST description fetchers."""
 
-    def query_pug_pubchem_description(self, cid, session, sem, max_retries=3, delay=1.0):
-        # TODO: implement PUG-REST query
-        pass
+    async def async_query_pug_pubchem_description(
+        self,
+        cid: int,
+        session: aiohttp.ClientSession,
+        sem: asyncio.Semaphore,
+        max_retries: int = 3,
+        delay: float = 1.0,
+    ):
+        url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/{cid}/JSON"
+        for attempt in range(max_retries):
+            async with sem:
+                try:
+                    async with session.get(url, timeout=30) as resp:
+                        resp.raise_for_status()
+                        data = await resp.json()
+                    break
+                except aiohttp.ClientError as e:
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(delay * (2**attempt))
+                        continue
+                    else:
+                        raise e
 
-    async def async_query_pubchem_descriptions(self, cids, workers=5):
-        # TODO: async batch fetch
-        pass
+        description = None
+        synonyms = []
 
-    def get_pubchem_descriptions(self, cids, workers=5):
-        # TODO: sync batch fetch
-        pass
+        for sec in data.get("Record", {}).get("Section", []):
+            heading = sec.get("TOCHeading", "")
+            if heading == "Names and Identifiers" and description is None:
+                for sub in sec.get("Section", []):
+                    if sub.get("TOCHeading") == "Record Description":
+                        for info in sub.get("Information", []):
+                            for mark in info.get("Value", {}).get("StringWithMarkup", []):
+                                text = mark.get("String", "").strip()
+                                if text:
+                                    description = text
+                                    break
+                            if description:
+                                break
+                    elif sub.get("TOCHeading") == "Synonyms":
+                        for sec in sub.get("Section", []):
+                            for info in sec.get("Information", []):
+                                for mark in info.get("Value", {}).get("StringWithMarkup", []):
+                                    text = mark.get("String", "").strip()
+                                    if text:
+                                        synonyms.append(text.lower().strip())
+                break
+
+        seen = set()
+        synonyms = [s for s in synonyms if not (s in seen or seen.add(s))]
+
+        return cid, {
+            "id": f"PUBCHEM.COMPOUND:{cid}",
+            "description": f"{description}[PUBCHEM]" if description else "",
+            "synonyms": synonyms,
+        }
+
+    async def async_query_pubchem_descriptions(
+        self,
+        cids: List[int],
+        workers: int = 5,
+    ) -> Dict[int, Dict[str, str]]:
+        cids = list(set(cids))
+
+        workers = min(workers, 5)
+        sem = asyncio.Semaphore(workers)
+        connector = aiohttp.TCPConnector(limit_per_host=workers)
+        cids = sorted(list(set(cids)))
+
+        results = {}
+        async with aiohttp.ClientSession(connector=connector) as session:
+            tasks = []
+            last_launch = 0.0
+
+            for cid in cids:
+                elapsed = time.perf_counter() - last_launch
+                if elapsed < 1.0 / 5:
+                    await asyncio.sleep(1.0 / 5 - elapsed)
+                last_launch = time.perf_counter()
+
+                task = asyncio.create_task(
+                    self.async_query_pug_pubchem_description(cid, session, sem)
+                )
+                tasks.append(task)
+
+            for cid, payload in await tqdm_asyncio.gather(*tasks, total=len(tasks)):
+                if payload:
+                    results[cid] = payload
+
+        return results
+
+    def get_pubchem_descriptions(self, cids: List[int], workers: int = 5):
+        return asyncio.run(self.async_query_pubchem_descriptions(cids, workers))
 
 
 class UniProtService:
@@ -386,6 +468,117 @@ class CacheManager(CacheHelper):
         super().__init__(cache_dir)
         print(f"CacheManager initialized. Cache directory is {self.cache_dir}")
 
+    def cache_entity(self, entity_type: str, **kwargs):
+        """
+        Build and cache data for a single entity type, updating the existing
+        cache file instead of overwriting it.
+        """
+        entity_map = {
+            "taxon_info": self._cache_taxon_info,
+            "taxon_description": self._cache_taxon_description,
+            "pubchem_description": self._cache_pubchem_description,
+            "pubchem_mw": self._cache_pubchem_mw,
+            "bigg_mapping": self._cache_bigg_mapping,
+            "uniprot": self._cache_uniprot,
+            "pubmed_metadata": self._cache_pubmed_metadata,
+        }
+
+        handler = entity_map.get(entity_type)
+        if not handler:
+            raise ValueError(f"Unknown entity type: {entity_type!r}")
+
+        print(f"\nCaching entity: '{entity_type}'...")
+        new_data = handler(**kwargs)
+
+        if new_data:
+            f_name = f"{entity_type}.pkl"
+            existing_data = self.load_pickle(f_name) or {}
+
+            if not isinstance(existing_data, dict):
+                print(f"Warning: Data in {f_name} is not a dictionary. Overwriting.")
+                existing_data = {}
+            print(f"Updating cache for {f_name}...")
+            existing_data.update(new_data)
+            self.save_pickle(existing_data, f_name)
+        else:
+            print(f"No new data generated for '{entity_type}'. Cache not updated.")
+
+    # TODO: Need futher detailed implementations for each caching method
+    def _cache_taxon_info(self, **kwargs):
+        print("Generating taxon info...")
+        return NCBITaxonomyService.query_taxon_info_from_biothings(**kwargs)
+
+    def _cache_taxon_description(self, **kwargs):
+        print("Generating taxon descriptions...")
+        pass
+
+    def _cache_pubchem_description(self, **kwargs):
+        print("Generating PubChem descriptions...")
+        pass
+
+    def _cache_pubchem_mw(self, **kwargs):
+        print("Generating PubChem molecular weights...")
+        pass
+
+    def _cache_bigg_mapping(self, **kwargs):
+        print("Generating BiGG mappings...")
+        pass
+
+    def _cache_uniprot(self, **kwargs):
+        print("Generating UniProt data...")
+        pass
+
+    def _cache_pubmed_metadata(self, **kwargs):
+        print("Generating PMID data...")
+        pass
+
+
+class CombinedCacheManager(CacheHelper):
+    """Manages the creation of a combined cache from individual relationship files."""
+
+    COMBINED_FILENAME = "gmmad2_combined_associations.pkl"
+
+    def __init__(self, cache_dir=None):
+        super().__init__(cache_dir)
+        print("CombinedCacheManager initialized.")
+
+    def create_combined_cache(self):
+        """
+        Loads individual relationship caches and combines them into one file.
+        """
+        print("\nCreating combined relationship cache...")
+
+        self._cache_relationship("microbe-disease")
+        self._cache_relationship("microbe-metabolite")
+        self._cache_relationship("metabolite-gene")
+
+        microbe_disease_data = self.load_pickle("microbe-disease.pkl") or {}
+        microbe_metabolite_data = self.load_pickle("microbe-metabolite.pkl") or {}
+        metabolite_gene_data = self.load_pickle("metabolite-gene.pkl") or {}
+
+        combined_data = {
+            "microbe_disease": microbe_disease_data,
+            "microbe_metabolite": microbe_metabolite_data,
+            "metabolite_gene": metabolite_gene_data,
+        }
+
+        self.save_pickle(combined_data, self.COMBINED_FILENAME)
+        print(f"Combined cache created at {self.COMBINED_FILENAME}")
+        return combined_data
+
+    def _cache_relationship(self, relationship_name: str):
+        """Placeholder to generate and save a single relationship cache."""
+        print(f"-> Generating temporary cache for '{relationship_name}'...")
+        if relationship_name == "microbe-disease":
+            data = {"microbeA": ["diseaseX"], "microbeB": ["diseaseY"]}
+        elif relationship_name == "microbe-metabolite":
+            data = {"microbeA": ["metabolite1"], "microbeC": ["metabolite2"]}
+        elif relationship_name == "metabolite-gene":
+            data = {"metabolite1": ["geneZ"], "metabolite2": ["geneW"]}
+        else:
+            data = {}
+
+        self.save_pickle(data, f"{relationship_name}.pkl")
 
 
 class ParserHelper:
