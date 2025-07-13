@@ -105,7 +105,9 @@ class NCBITaxonomyService:
         self.ncbi.update_taxonomy_database()
         return Path(taxdump_path)
 
-    def get_taxid_mapping_from_ncbi_merged_dmp(self, tar_gz_path: str = "taxdump.tar.gz", f_name: str = "merged.dmp") -> dict:
+    def get_taxid_mapping_from_ncbi_merged_dmp(
+        self, tar_gz_path: str = "taxdump.tar.gz", f_name: str = "merged.dmp"
+    ) -> dict:
         """
         Parses 'merged.dmp' from the provided NCBI taxdump tarball.
         Returns a dictionary mapping old taxids to new taxids.
@@ -748,6 +750,53 @@ class CacheManager(CacheHelper):
 
         return filtered_taxon_info
 
+    def update_taxon_info_with_current_taxids(self):
+        """
+        Loads not-found taxids, finds their current IDs, queries for them,
+        and updates the main taxon_info cache.
+        """
+        print("\n---Updating cache with re-mapped taxids---")
+
+        notfound_f_name = "gmmad2_taxon_info_notfound.pkl"
+        taxid_not_found = self.load_pickle(notfound_f_name) or []
+        if not taxid_not_found:
+            print("No 'not found' taxids to process.")
+            return
+
+        ncbi_service = NCBITaxonomyService()
+        taxid_map = ncbi_service.get_taxid_mapping_from_ncbi_merged_dmp()
+        if not taxid_map:
+            print("Could not load the taxid mapping. Aborting update.")
+            return
+
+        new_taxid_map = ncbi_service.get_current_taxid_mapping(
+            old_taxids=taxid_not_found, merged_mapping=taxid_map
+        )
+        new_taxids = [new_id for new_id in new_taxid_map.values() if new_id]
+        if not new_taxids:
+            print("No new mappings found for the 'not found' taxids.")
+            return
+
+        main_cache_f_name = "gmmad2_taxon_info.pkl"
+        main_cache_data = self.load_pickle(main_cache_f_name) or {}
+
+        new_taxids_to_query = [tid for tid in new_taxids if tid not in main_cache_data]
+        if not new_taxids_to_query:
+            print("The mapped taxids were already present in the main taxon info cache.")
+            return
+        new_taxon_info = ncbi_service.query_taxon_info_from_biothings(taxids=new_taxids_to_query)
+
+        new_info_to_add, _ = ncbi_service.filter_taxon_info(new_taxon_info)
+
+        if not new_info_to_add:
+            print("-> BioThings API query for new taxids returned no valid data.")
+            return
+        print(
+            f"Adding {len(new_info_to_add)} newly queried taxon info to the main taxon info cache."
+        )
+        main_cache_data.update(new_info_to_add)
+        self.save_pickle(main_cache_data, main_cache_f_name)
+
     def _cache_taxon_description(self, **kwargs):
         ncit_service = NCITTaxonomyService()
 
@@ -1044,14 +1093,12 @@ if __name__ == "__main__":
     print(taxid_not_found)
 
     print("\n\n--- THIRD RUN: Caching a new mapped set of taxids ---")
-    taxid_map = ncbi_svc.get_taxid_mapping_from_ncbi_merged_dmp()
-    new_taxid_map = ncbi_svc.get_current_taxid_mapping(taxid_not_found, taxid_map)
-    new_taxids = [new_taxid for new_taxid in new_taxid_map.values() if new_taxid is not None]
-    cache_manager.cache_entity("taxon_info", taxids=new_taxids)
+    # taxid_map = ncbi_svc.get_taxid_mapping_from_ncbi_merged_dmp()
+    # new_taxid_map = ncbi_svc.get_current_taxid_mapping(taxid_not_found, taxid_map)
+    # new_taxids = [new_taxid for new_taxid in new_taxid_map.values() if new_taxid is not None]
+    # cache_manager.cache_entity("taxon_info", taxids=new_taxids)
+    cache_manager.update_taxon_info_with_current_taxids()
 
     print("\n\n--- VERIFICATION ---")
     final_cache = cache_manager.load_pickle("gmmad2_taxon_info.pkl")
-    print("Final cache contains all unique taxids:")
-    print(len(final_cache.keys()))
-
-    if
+    print(f"Final cache contains {len(final_cache.keys())} unique taxids.")
