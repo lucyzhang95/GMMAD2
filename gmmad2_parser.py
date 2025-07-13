@@ -1096,12 +1096,14 @@ class DataCachePipeline:
         self._cache_mime_taxon_info()
         self._cache_mime_pubchem_descriptions()
         self._cache_mege_pubchem_descriptions()
+        self._cache_mege_gene_and_protein_info()
 
         self._update_taxon_info()
         self._update_taxon_info_with_ncit_descriptions()
 
         self._verify_taxon_info_cache()
         self._verify_pubchem_cache()
+        self._verify_gene_and_protein_info_cache()
 
 
 class ParserHelper:
