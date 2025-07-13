@@ -345,6 +345,9 @@ class PubChemService:
                     else:
                         print(f"Error: All retries failed for querying pubchem_cid: {cid}.")
                         return None
+                finally:
+                    await asyncio.sleep(2)
+
         if not data:
             return None
 
@@ -395,7 +398,7 @@ class PubChemService:
 
         async with aiohttp.ClientSession(connector=connector) as session:
             tasks = [
-                self.async_query_pug_pubchem_description(session, cid, sem) for cid in unique_cids
+                self.async_query_pug_pubchem_description(cid, session, sem) for cid in unique_cids
             ]
 
             print(f"Querying PubChem for {len(unique_cids)} CIDs...")
@@ -770,7 +773,6 @@ class CacheManager(CacheHelper):
             if not new_id:
                 continue
             if new_id in main_taxon_info_cache:
-                print(f"-> Remapping old ID '{old_id}' to existing data for new ID '{new_id}'.")
                 info_to_add_from_remap[old_id] = main_taxon_info_cache[new_id]
             else:
                 new_taxids_to_query.append(new_id)
@@ -815,6 +817,8 @@ class CacheManager(CacheHelper):
             print(f"Main taxon info cache not found at '{main_cache_f_name}'. Cannot update.")
             return
 
+        print(f"Loaded '{main_cache_f_name}' with {len(taxon_info_cache)} keys.")
+
         desc_cache = self.load_pickle(desc_cache_f_name) or {}
         names_need_desc = set()
         for info in taxon_info_cache.values():
@@ -851,6 +855,7 @@ class CacheManager(CacheHelper):
                     update_count += 1
         if update_count > 0:
             print(f"Updated {update_count} entries in the main taxon info cache with descriptions.")
+            print(f"Saving '{main_cache_f_name}' with {len(taxon_info_cache)} keys.")
             self.save_pickle(taxon_info_cache, main_cache_f_name)
         else:
             print("-> No entries in the main taxon info cache needed an update.")
@@ -870,9 +875,13 @@ class CacheManager(CacheHelper):
         pubchem_service = PubChemService()
         pubchem_desc = pubchem_service.run_async_query_pug_pubchem_descriptions(cids=cids)
 
-        self.save_pickle(pubchem_desc, f_name)
+        if not pubchem_desc:
+            print("-> API query did not return any new descriptions.")
+            return None
+        print(f"Received {len(pubchem_desc)} new PubChem descriptions to cache.")
+        existing_data.update(pubchem_desc)
 
-        return pubchem_desc
+        self.save_pickle(pubchem_desc, f_name)
 
     def _cache_pubchem_mw(self, **kwargs):
         print("Generating PubChem molecular weights...")
@@ -1010,7 +1019,7 @@ class DataCachePipeline:
         self._cache_mime_taxon_info()
         self._update_taxon_info()
         self._verify_taxon_info_cache()
-        self._update_taxon_info_with_ncit_descriptions()
+        # self._update_taxon_info_with_ncit_descriptions()
         self._verify_taxon_info_cache()
         self._cache_mime_pubchem_descriptions()
         self._cache_mege_pubchem_descriptions()
