@@ -3,7 +3,6 @@ import csv
 import json
 import os
 import pickle
-import shutil
 import tarfile
 import time
 import uuid
@@ -146,6 +145,7 @@ class NCBITaxonomyService:
         taxon_info = t.gettaxa(
             taxids, fields=["scientific_name", "parent_taxid", "lineage", "rank"]
         )
+        print(f"(BioThings API Call) Querying for {len(taxids)} taxids: {taxids[:5]}...")
         return taxon_info
 
     def filter_taxon_info(self, taxon_info: list) -> dict:
@@ -616,7 +616,6 @@ class PubMedService:
 
 class CacheHelper:
     """Generic on-disk cache and serialization helpers."""
-
     DEFAULT_CACHE_DIR = os.path.join(os.getcwd(), "cache")
 
     def __init__(self, cache_dir=None):
@@ -643,7 +642,6 @@ class CacheHelper:
         """Loads an object from a pickle file. Returns None if the file doesn't exist."""
         path = self._get_path(f_name)
         if not os.path.exists(path):
-            print(f"{path} does not exist.")
             return None
         try:
             with open(path, "rb") as in_f:
@@ -707,17 +705,17 @@ class CacheManager(CacheHelper):
         f_name = f"gmmad2_{entity_type}.pkl"
         existing_data = self.load_pickle(f_name) or {}
         if not isinstance(existing_data, dict):
-            print(f"Warning: Data in {f_name} is not a dictionary. Overwriting.")
+            print(f"*Warning: Data in {f_name} is not a dictionary. Overwriting.")
             existing_data = {}
 
         kwargs["existing_data"] = existing_data
         new_data = handler(**kwargs)
         if new_data:
-            print(f"Received {len(new_data)} new items to cache.")
+            print(f"-> Received {len(new_data)} new items to cache.")
             existing_data.update(new_data)
             self.save_pickle(existing_data, f_name)
         else:
-            print(f"No new data to cache for '{entity_type}'.")
+            print(f"-> No new data to cache for '{entity_type}'.")
 
     # TODO: Need further detailed implementations for each caching method
     def _cache_taxon_info(self, **kwargs):
