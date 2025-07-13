@@ -753,7 +753,7 @@ class CacheManager(CacheHelper):
 
         return filtered_taxon_info
 
-    def update_taxon_info_with_current_taxids(self):
+    def _update_taxon_info_with_current_taxids(self):
         """
         Loads not-found taxids, finds their current IDs, queries for them,
         and updates the main taxon_info cache.
@@ -933,7 +933,7 @@ class DataCachePipeline:
         self.cache_manager.cache_entity("taxon_info", taxids=taxids)
 
     def _update_taxon_info(self):
-        self.cache_manager.update_taxon_info_with_current_taxids()
+        self.cache_manager._update_taxon_info_with_current_taxids()
 
     def _verify_taxon_info_cache(self):
         taxon_info_cache = self.cache_manager.load_pickle("gmmad2_taxon_info.pkl")
