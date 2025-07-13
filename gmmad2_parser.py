@@ -172,6 +172,7 @@ class NCBITaxonomyService:
 
 class NCITTaxonomyService:
     """NCIT-based organism mappings and descriptions."""
+    load_dotenv()
 
     def __init__(self):
         self.NCIT_API_KEY = os.getenv("NCIT_API_KEY")
@@ -262,7 +263,9 @@ class NCITTaxonomyService:
     async def async_query_ncit_taxon_descriptions(
         self, taxon_names, max_concurrent=5
     ) -> dict[str, dict]:
-        unique_names = sorted(list(set(n.lower() for n in taxon_names)))
+        unique_names = sorted(
+            list(set(str(n.lower().strip()) for n in taxon_names if n is not None))
+        )
         print(
             f"(NCIt BioPortal Call) Querying for {len(unique_names)} taxon names: {unique_names[:5]}..."
         )
@@ -309,19 +312,6 @@ class NCITTaxonomyService:
         }
         """
         return asyncio.run(self.async_query_ncit_taxon_descriptions(taxon_names))
-
-    def update_taxon_info_with_ncit_description(self, taxon_info: dict, descriptions: dict) -> dict:
-        """
-
-        :param taxon_info: output of NCBITaxonomyService.query_taxon_info_from_biothings
-        :param descriptions: output of NCITTaxonomyService.run_async_query_ncit_taxon_descriptions
-        :return:
-        """
-        for info in taxon_info.values():
-            name = info.get("scientific_name").lower()
-            descr_info = descriptions.get(name, {})
-            info.update(descr_info)
-        return taxon_info
 
 
 class PubChemService:
@@ -699,7 +689,7 @@ class CacheManager(CacheHelper):
         """
         entity_map = {
             "taxon_info": self._cache_taxon_info,
-            "taxon_description": self._cache_taxon_description,
+            "taxon_description": self._update_taxon_info_with_descriptions,
             "pubchem_description": self._cache_pubchem_description,
             "pubchem_mw": self._cache_pubchem_mw,
             "bigg_mapping": self._cache_bigg_mapping,
@@ -815,7 +805,7 @@ class CacheManager(CacheHelper):
         main_taxon_info_cache.update(new_taxon_info_to_add)
         self.save_pickle(main_taxon_info_cache, main_cache_f_name)
 
-    def update_taxon_info_with_descriptions(self):
+    def _update_taxon_info_with_descriptions(self):
         """
         Loads the main taxon info cache, finds entries missing a description,
         queries for them, and saves the updated data back to the same file.
@@ -846,9 +836,8 @@ class CacheManager(CacheHelper):
             return
 
         ncit_service = NCITTaxonomyService()
-        unique_names_to_query = names_to_query
         taxon_descs = ncit_service.run_async_query_ncit_taxon_descriptions(
-            taxon_names=unique_names_to_query
+            taxon_names=names_to_query
         )
 
         if not taxon_descs:
@@ -967,6 +956,9 @@ class DataCachePipeline:
     def _update_taxon_info(self):
         self.cache_manager._update_taxon_info_with_current_taxids()
 
+    def _update_taxon_info_with_ncit_descriptions(self):
+        self.cache_manager._update_taxon_info_with_descriptions()
+
     def _verify_taxon_info_cache(self):
         taxon_info_cache = self.cache_manager.load_pickle("gmmad2_taxon_info.pkl")
         if taxon_info_cache:
@@ -979,6 +971,7 @@ class DataCachePipeline:
         self._cache_midi_taxon_info()
         self._cache_mime_taxon_info()
         self._update_taxon_info()
+        self._update_taxon_info_with_ncit_descriptions()
         self._verify_taxon_info_cache()
 
 
