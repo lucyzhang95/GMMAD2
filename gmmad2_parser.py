@@ -3,6 +3,7 @@ import csv
 import json
 import os
 import pickle
+import shutil
 import tarfile
 import time
 import uuid
@@ -146,6 +147,16 @@ class NCBITaxonomyService:
             taxids, fields=["scientific_name", "parent_taxid", "lineage", "rank"]
         )
         return taxon_info
+
+    def filter_taxon_info(self, taxon_info: list) -> dict:
+        """
+        Filters the taxon_info dictionary to remove not found entries.
+
+        :param taxon_info: Output of query_taxon_info_from_biothings.
+        :return:
+        """
+        taxon_info_filtered = {t["query"]: t for t in taxon_info if "notfound" not in t.keys()}
+        return taxon_info_filtered
 
     def fetch_taxon_names_from_taxon_info(self, taxon_info: dict) -> list[str]:
         """Extracts biothings names from the taxon_info dictionary."""
@@ -672,7 +683,6 @@ class CacheManager(CacheHelper):
     def __init__(self, cache_dir=None):
         """Initializes the CacheManager and ensures the cache directory exists."""
         super().__init__(cache_dir)
-        print(f"CacheManager initialized. Cache directory is {self.cache_dir}")
 
     def cache_entity(self, entity_type: str, **kwargs):
         """
@@ -693,30 +703,60 @@ class CacheManager(CacheHelper):
         if not handler:
             raise ValueError(f"Unknown entity type: {entity_type!r}")
 
-        print(f"\nCaching entity: '{entity_type}'...")
+        print(f"\n---Caching entity: '{entity_type}' ---")
+        f_name = f"gmmad2_{entity_type}.pkl"
+        existing_data = self.load_pickle(f_name) or {}
+        if not isinstance(existing_data, dict):
+            print(f"Warning: Data in {f_name} is not a dictionary. Overwriting.")
+            existing_data = {}
+
+        kwargs["existing_data"] = existing_data
         new_data = handler(**kwargs)
-
         if new_data:
-            f_name = f"{entity_type}.pkl"
-            existing_data = self.load_pickle(f_name) or {}
-
-            if not isinstance(existing_data, dict):
-                print(f"Warning: Data in {f_name} is not a dictionary. Overwriting.")
-                existing_data = {}
-            print(f"Updating cache for {f_name}...")
+            print(f"Received {len(new_data)} new items to cache.")
             existing_data.update(new_data)
             self.save_pickle(existing_data, f_name)
         else:
-            print(f"No new data generated for '{entity_type}'. Cache not updated.")
+            print(f"No new data to cache for '{entity_type}'.")
 
-    # TODO: Need futher detailed implementations for each caching method
+    # TODO: Need further detailed implementations for each caching method
     def _cache_taxon_info(self, **kwargs):
-        print("Generating taxon info...")
-        return NCBITaxonomyService.query_taxon_info_from_biothings(**kwargs)
+        ncbi_service = NCBITaxonomyService()
+
+        taxids = kwargs.get("taxids", [])
+        if not taxids:
+            return None
+
+        f_name = "gmmad2_taxon_info.pkl"
+        existing_data = self.load_pickle(f_name) or {}
+        taxids_to_query = [tid for tid in taxids if tid not in existing_data]
+        if not taxids_to_query:
+            print("All requested taxids are already in the cache.")
+            return None
+
+        taxon_info = ncbi_service.query_taxon_info_from_biothings(taxids=taxids_to_query)
+        filtered_taxon_info = ncbi_service.filter_taxon_info(taxon_info)
+
+        return filtered_taxon_info
 
     def _cache_taxon_description(self, **kwargs):
-        print("Generating taxon descriptions...")
-        pass
+        ncit_service = NCITTaxonomyService()
+
+        taxon_names = kwargs.get("taxon_names", [])
+        if not taxon_names:
+            return None
+
+        f_name = "gmmad2_taxon_description.pkl"
+        existing_data = self.load_pickle(f_name) or {}
+        taxon_names_to_query = [tname for tname in taxon_names if tname not in existing_data]
+        if not taxon_names_to_query:
+            print("All requested taxon names are already in the cache.")
+            return None
+
+        new_taxon_desc = ncit_service.run_async_query_ncit_taxon_descriptions(
+            taxon_names=taxon_names_to_query
+        )
+        return new_taxon_desc
 
     def _cache_pubchem_description(self, **kwargs):
         print("Generating PubChem descriptions...")
@@ -965,3 +1005,31 @@ class DataLoader:
     def load_entire_gmmad2_data(self, f_path):
         # TODO: concatenate all generators into a single iterator
         pass
+
+
+if __name__ == "__main__":
+    csv_parser = CSVParser()
+    manager = CacheManager()
+
+    print("\n--- FIRST RUN: Caching initial set of taxids ---")
+    midi_path = os.path.join("downloads", "disease_species.csv")
+    midi_taxids = [line[5] for line in CSVParser().line_generator_for_microbe_disease(midi_path)]
+    manager.cache_entity("taxon_info", taxids=midi_taxids)
+
+    print("\n\n--- SECOND RUN: Caching an overlapping set of taxids ---")
+    mime_path = os.path.join("downloads", "micro_metabolic.csv")
+    mime_taxids = taxids = [
+        line[9]
+        if (line[9] and line[9] != "not available")
+        else line[16]
+        if (line[16] and line[16] != "not available")
+        else None
+        for line in csv_parser.line_generator(mime_path)
+    ]
+    mime_taxids = [t for t in mime_taxids if t]
+    manager.cache_entity("taxon_info", taxids=mime_taxids)
+
+    print("\n\n--- VERIFICATION ---")
+    final_cache = manager.load_pickle("gmmad2_taxon_info.pkl")
+    print("Final cache contains all unique taxids:")
+    print(len(final_cache.keys()))
