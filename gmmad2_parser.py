@@ -18,7 +18,7 @@ import requests
 from Bio import Entrez
 from dotenv import load_dotenv
 from ete3 import NCBITaxa
-from tqdm.asyncio import tqdm, tqdm_asyncio
+from tqdm.asyncio import tqdm_asyncio
 
 
 class CSVParser:
@@ -353,37 +353,130 @@ class PubChemService:
 
         return results
 
-    def get_pubchem_descriptions(self, cids: List[int], workers: int = 5):
+    def run_async_query_pubchem_descriptions(self, cids: List[int], workers: int = 5):
         return asyncio.run(self.async_query_pubchem_descriptions(cids, workers))
 
 
 class UniProtService:
     """UniProt REST API helpers."""
 
-    async def uniprot_query_protein_info(
-        self, uniprot_id, session, sem, max_retries=3, delay=1.0, timeout=30.0
-    ):
-        # TODO: implement UniProt REST call
-        pass
+    async def async_query_uniprot_name_and_function(
+        self,
+        uniprot_id: str,
+        session: aiohttp.ClientSession,
+        sem: asyncio.Semaphore,
+        max_retries: int = 3,
+        delay: float = 1.0,
+        timeout: float = 30.0,
+    ) -> (str, Dict[str, str]):
+        url = f"https://rest.uniprot.org/uniprotkb/{uniprot_id}.json"
+        for attempt in range(max_retries):
+            async with sem:
+                try:
+                    async with session.get(url, timeout=timeout) as resp:
+                        resp.raise_for_status()
+                        data = await resp.json()
+                    break
+                except aiohttp.ClientError:
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(delay * (2**attempt))
+                        continue
+                    raise
 
-    async def get_batch_protein_info_async(self, uniprot_ids, workers=5, rate_limit=5.0):
-        # TODO: async batch UniProt queries
-        pass
+        rec_name = data.get("proteinDescription", {}).get("recommendedName", {})
+        raw_full = rec_name.get("fullName", {}).get("value")
+        full_name = raw_full.lower() if isinstance(raw_full, str) else None
 
-    def get_protein_info(self, uniprot_ids, workers=5):
-        # TODO: sync wrapper
-        pass
+        raw_short = next(
+            (sn.get("value") for sn in rec_name.get("shortNames", []) if sn.get("value")), None
+        )
+        if raw_short is None:
+            alter_list = data.get("proteinDescription", {}).get("alternativeNames", [])
+            raw_short = next(
+                (
+                    sn.get("value")
+                    for alt in alter_list
+                    for sn in alt.get("shortNames", [])
+                    if sn.get("value")
+                ),
+                None,
+            )
+        name = raw_short if isinstance(raw_short, str) else None
+
+        desc = None
+        for comment in data.get("comments", []):
+            if comment.get("commentType") == "FUNCTION":
+                texts = comment.get("texts", [])
+                if texts and texts[0].get("value"):
+                    desc = texts[0]["value"]
+                    break
+        if desc is None:
+            desc = "Function not found"
+
+        return uniprot_id, {
+            "name": name,
+            "full_name": full_name,
+            "description": desc,
+        }
+
+    async def async_query_uniprot_names_and_functions(
+        self,
+        uniprot_ids: List[str],
+        workers: int = 5,
+        rate_limit: float = 5.0,
+    ) -> Dict[str, Dict[str, str]]:
+        ids = sorted(set(uniprot_ids))
+        sem = asyncio.Semaphore(workers)
+        connector = aiohttp.TCPConnector(limit_per_host=workers)
+        results: Dict[str, Dict[str, str]] = {}
+
+        async with aiohttp.ClientSession(connector=connector) as session:
+            tasks = []
+            last_launch = 0.0
+            for uid in ids:
+                elapsed = time.perf_counter() - last_launch
+                min_interval = 1.0 / rate_limit
+                if elapsed < min_interval:
+                    await asyncio.sleep(min_interval - elapsed)
+                last_launch = time.perf_counter()
+
+                task = asyncio.create_task(
+                    self.async_query_uniprot_name_and_function(uid, session, sem)
+                )
+                tasks.append(task)
+
+            for uid, payload in await tqdm_asyncio.gather(*tasks, total=len(tasks)):
+                results[uid] = payload
+
+        return results
+
+    def run_async_query_uniprot_names_and_functions(
+        self, uniprot_ids: List[str], workers: int = 5
+    ) -> Dict[str, Dict[str, str]]:
+        return asyncio.run(self.async_query_uniprot_names_and_functions(uniprot_ids, workers))
 
 
-class BiGGService:
+class BiGGParser:
     """BiGG metabolite mapping helper."""
 
-    def get_bigg_metabolite_mapping(self, in_f):
-        # TODO: parse BiGG mapping file
-        pass
+    def __init__(self, csv_parser):
+        self.csv_parser = CSVParser()
+
+    def get_bigg_metabolite_mapping(
+        self, in_f: str | os.PathLike, delimiter: str = "\t", skip_header: bool = True
+    ) -> Dict[str, str]:
+        bigg_map: Dict[str, str] = {}
+        for fields in self.csv_parser.line_generator(
+            in_f, delimiter=delimiter, skip_header=skip_header
+        ):
+            bigg_id = fields[1].strip()
+            metab_key = fields[2].strip().lower()
+            bigg_map[metab_key] = bigg_id
+
+        return bigg_map
 
 
-class CheminformaticsUtils:
+class ChemPropertyUtils:
     def bt_get_mw_logp(self, pubchem_cids):
         # TODO: compute molecular weight, logP
         pass
