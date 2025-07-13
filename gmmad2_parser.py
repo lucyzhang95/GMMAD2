@@ -162,13 +162,61 @@ class NCITTaxonomyService:
     def __init__(self):
         self.NCIT_API_KEY = os.getenv("NCIT_API_KEY")
 
-    def dump_ncit_source(self, name, out_path):
-        # TODO: dump NCIT source
-        pass
+    def download_ncit_source(self, f_name, out_path):
+        """Downloads the NCI Thesaurus_25.06e.FLAT.zipfile from the NCI FTP server."""
+        url = f"https://evs.nci.nih.gov/ftp1/NCI_Thesaurus/{f_name}"
+        try:
+            resp = requests.get(url, stream=True)
+            resp.raise_for_status()
+            with open(out_path, "wb") as f:
+                for chunk in resp.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            print(f"{f_name} downloaded successfully.")
 
-    def build_ncit_organism_mapping(self, f_name, path):
-        # TODO: build mapping
-        pass
+        except requests.exceptions.RequestException as e:
+            print(f"An error occurred while downloading the file: {e}")
+
+    def get_ncit_organism_mapping(self, f_name, path):
+        if not Path(path).exists():
+            self.download_ncit_source(f_name, path)
+
+        with zipfile.ZipFile(path) as zf:
+            with zf.open("Thesaurus.txt") as f:
+                df = pd.read_csv(f, sep="\t", dtype=str).fillna("")
+
+        df.columns = [
+            "code",
+            "concept IRI",
+            "parents",
+            "synonyms",
+            "definition",
+            "display name",
+            "concept status",
+            "semantic type",
+            "concept in subset",
+        ]
+
+        relevant_types = {
+            "Bacterium",
+            "Virus",
+            "Fungus",
+            "Eukaryote",
+            "Organism",
+            "Animal",
+            "Group|Organism",
+        }
+
+        df_organism = df[df["semantic type"].isin(relevant_types)].copy()
+
+        mapping_result = {}
+        for _, row in df_organism.iterrows():
+            name = str(row["display name"]).strip().lower()
+            description = str(row["definition"]).strip()
+            ncit_code = str(row["code"]).strip()
+            if not name or pd.isna(description):
+                continue
+            mapping_result[name] = {"description": description, "xrefs": {"ncit": ncit_code}}
+        return mapping_result
 
     async def async_query_ncit_taxon_description(
         self, session: aiohttp.ClientSession, name: str, sem: asyncio.Semaphore
