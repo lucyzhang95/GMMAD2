@@ -1,5 +1,6 @@
 import asyncio
 import csv
+import itertools
 import json
 import logging
 import os
@@ -10,7 +11,7 @@ import uuid
 import zipfile
 from collections import Counter
 from pathlib import Path
-from typing import Callable, Dict, Iterator, List
+from typing import Dict, Iterator, List
 
 import aiohttp
 import biothings_client as bt
@@ -1643,20 +1644,40 @@ class GMMAD2Parser(CacheHelper):
 
 
 class DataLoader:
-    def __init__(self):
-        pass
+    def __init__(self, cache_dir="cache", downloads_dir="downloads"):
+        csv_parser = CSVParser()
+        cache_pipeline = DataCachePipeline()
+        parser_helpers = ParserHelper()
 
-    def load_micro_disease_data(self, f_path):
-        # TODO: parse microbe-disease table
-        pass
+        self.parser = GMMAD2Parser(
+            csv_parser=csv_parser,
+            cache_pipeline=cache_pipeline,
+            parser_helpers=parser_helpers,
+            cache_dir=cache_dir,
+            downloads_dir=downloads_dir,
+        )
+        print("🚀 DataLoader initialized.")
 
-    def load_micro_meta_data(self, f_path):
-        # TODO: parse microbe-metabolite table
-        pass
+    def load_microbe_disease_data(self) -> Iterator[dict]:
+        """Loads and yields data from the microbe-disease file."""
+        return self.parser.parse_microbe_disease()
 
-    def load_entire_gmmad2_data(self, f_path):
-        # TODO: concatenate all generators into a single iterator
-        pass
+    def load_microbe_metabolite_data(self) -> Iterator[dict]:
+        """Loads and yields data from the microbe-metabolite file."""
+        return self.parser.parse_microbe_metabolite()
+
+    def load_metabolite_gene_data(self) -> Iterator[dict]:
+        """Loads and yields data from the metabolite-gene file."""
+        return self.parser.parse_metabolite_gene()
+
+    def load_entire_gmmad2_data(self) -> Iterator[dict]:
+        """Loads and yields all GMMAD2 data sources."""
+        print("\n--- Loading all GMMAD2 data sources ---")
+        return itertools.chain(
+            self.load_microbe_disease_data(),
+            self.load_microbe_metabolite_data(),
+            self.load_metabolite_gene_data(),
+        )
 
 
 if __name__ == "__main__":
