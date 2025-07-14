@@ -1003,54 +1003,6 @@ class CacheManager(CacheHelper):
         self.save_pickle(existing_data, "gmmad2_pubmed_metadata.pkl")
 
 
-class RecordCacheManager(CacheHelper):
-    """Manages the creation of a combined cache from individual relationship files."""
-
-    COMBINED_FILENAME = "gmmad2_records.pkl"
-
-    def __init__(self, cache_dir=None):
-        super().__init__(cache_dir)
-        print("CombinedCacheManager initialized.")
-
-    def cache_combined_associations(self):
-        """
-        Loads individual relationship caches and combines them into one file.
-        """
-        print("\nCreating combined relationship cache...")
-
-        self._cache_association("microbe-disease")
-        self._cache_association("microbe-metabolite")
-        self._cache_association("metabolite-gene")
-
-        microbe_disease_data = self.load_pickle("microbe-disease.pkl") or {}
-        microbe_metabolite_data = self.load_pickle("microbe-metabolite.pkl") or {}
-        metabolite_gene_data = self.load_pickle("metabolite-gene.pkl") or {}
-
-        combined_data = {
-            "microbe_disease": microbe_disease_data,
-            "microbe_metabolite": microbe_metabolite_data,
-            "metabolite_gene": metabolite_gene_data,
-        }
-
-        self.save_pickle(combined_data, self.COMBINED_FILENAME)
-        print(f"Combined cache created at {self.COMBINED_FILENAME}")
-        return combined_data
-
-    def _cache_association(self, assocation: str):
-        """Placeholder to generate and save a single relationship cache."""
-        print(f"-> Generating temporary cache for '{assocation}'...")
-        if assocation == "microbe-disease":
-            data = {"microbeA": ["diseaseX"], "microbeB": ["diseaseY"]}
-        elif assocation == "microbe-metabolite":
-            data = {"microbeA": ["metabolite1"], "microbeC": ["metabolite2"]}
-        elif assocation == "metabolite-gene":
-            data = {"metabolite1": ["geneZ"], "metabolite2": ["geneW"]}
-        else:
-            data = {}
-
-        self.save_pickle(data, f"{assocation}.pkl")
-
-
 class DataCachePipeline:
     def __init__(self, cache_dir="cache", downloads_dir="downloads"):
         self.downloads_dir = downloads_dir
@@ -1641,6 +1593,36 @@ class GMMAD2Parser(CacheHelper):
                 "object": object_node,
                 "subject": subject_node,
             }
+
+
+class RecordCacheManager(CacheHelper):
+    """Manages the creation of a combined cache from individual relationship files."""
+
+    COMBINED_FILENAME = "gmmad2_parsed_records.pkl"
+
+    def __init__(self, cache_dir=None):
+        super().__init__(cache_dir)
+        print("RecordCacheManager initialized.")
+
+    def cache_combined_associations(self, data_loader):
+        """
+        Uses the DataLoader to parse each relationship and combines them into one file.
+        The final format is a dictionary grouped by relationship type.
+        """
+        print("\nCreating full GMMAD2 association record cache...")
+
+        combined_data = {
+            "microbe-disease": list(data_loader.load_microbe_disease_data()),
+            "microbe-metabolite": list(data_loader.load_microbe_metabolite_data()),
+            "metabolite-gene": list(data_loader.load_metabolite_gene_data()),
+        }
+
+        self.save_pickle(combined_data, self.COMBINED_FILENAME)
+        total_records = sum(len(v) for v in combined_data.values())
+        print(
+            f"Full GMMAD2 association record cache with {total_records} records created at {self.COMBINED_FILENAME}"
+        )
+        return combined_data
 
 
 class DataLoader:
