@@ -6,12 +6,23 @@
     "license": "Creative Commons Attribution 4.0 International License (CC BY 4.0)",
     "source_last_modified": "04/20/2025",
     "source_download_date": "07/07/2025",
-     "source_last_parsed": ""
+     "source_last_parsed": "07/23/2025"
 
   },
   "display_name": "GMMAD2",
   "biothing_type": "association",
-  "requires": [],
+  "requires": [
+    "asyncio",
+    "aiohttp",
+    "tarfile",
+    "pandas",
+    "requests",
+    "biothings_client",
+    "Bio",
+    "dotenv",
+    "ete3",
+    "tqdm"
+  ],
   "dumper": {
     "data_url": [
       "http://gepa.org.cn/static2/file/micro_metabolic.csv",
@@ -23,7 +34,7 @@
     "release": "version:get_release"
   },
   "uploader": {
-    "parser": "gmmad2_parser:load_gmmad2_data",
+    "parser": "gmmad2_parser:DataLoader().load_entire_gmmad2_data",
     "on_duplicates": "error"
   }
 }
