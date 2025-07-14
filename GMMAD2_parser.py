@@ -1392,7 +1392,7 @@ class GMMAD2Parser(CacheHelper):
 
     def _get_midi_association_node(self, line: list) -> dict:
         node = {
-            "predicate": "OrganismalEntityAsAModelOfDiseaseAssociation",
+            "predicate": "biolink:OrganismalEntityAsAModelOfDiseaseAssociation",
             "type": "biolink:associated_with",
             "qualifier": line[17].lower(),
             "qualifier_ratio": float(line[16]) if line[16] else None,
