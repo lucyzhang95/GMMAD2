@@ -1396,14 +1396,14 @@ class GMMAD2Parser(CacheHelper):
         cid: str,
         name: str,
         formula: str,
-        line: list,
+        primary_id: str,
+        xrefs: dict,
         pubchem_desc: dict,
         pubchem_mw: dict,
-        bigg_mapping: dict,
-        id_helper_func: Callable,
     ) -> dict:
+
         node = {
-            "id": None,
+            "id": primary_id if primary_id else str(uuid.uuid4()),
             "name": name.lower(),
             "synonym": pubchem_desc.get(cid, {}).get("synonyms", []),
             "description": pubchem_desc.get(cid, {}).get("description", ""),
@@ -1411,14 +1411,8 @@ class GMMAD2Parser(CacheHelper):
             "molecular_weight": pubchem_mw.get(cid, {}).get("molecular_weight", {}),
             "xlogp": pubchem_mw.get(cid, {}).get("xlogp", None),
             "type": "biolink:SmallMolecule",
+            "xrefs": xrefs,
         }
-        id_xrefs = id_helper_func(line, bigg_mapping)
-        if id_xrefs:
-            primary_id, xrefs = id_xrefs
-        else:
-            primary_id, xrefs = None, {}
-        node["id"] = primary_id if primary_id else str(uuid.uuid4())
-        node["xrefs"] = xrefs
         return self.parser_helpers.remove_empty_none_values(node)
 
     def _get_gene_node(self, line: list, protein_and_gene_info: dict) -> dict:
@@ -1492,7 +1486,7 @@ class GMMAD2Parser(CacheHelper):
         }
         return self.parser_helpers.remove_empty_none_values(node)
 
-    def _create_mege_association_node(self, line: list, pmid_metadata: dict) -> dict:
+    def _get_mege_association_node(self, line: list, pmid_metadata: dict) -> dict:
         habitat = (
             [h.strip().lower() for h in line[9].split(";")]
             if line[9] and line[9] != "Unknown"
@@ -1579,17 +1573,27 @@ class GMMAD2Parser(CacheHelper):
                 else None
             )
             subject_node = self._get_microbe_node(taxid, line[2], taxon_cache)
+
+            mime_id_hierarchy = [
+                (line[6], "PUBCHEM.COMPOUND"),
+                (line[8], "KEGG"),
+                (line[18], "SMILES"),
+                (line[19], "HMDB"),
+                (bigg_mapping.get(line[5].lower()), "BIGG.METABOLITE"),
+            ]
+            primary_id, xrefs = self.parser_helpers.assign_primary_metabolite_id(mime_id_hierarchy)
             object_node = self._get_metabolite_node(
                 cid=line[6],
-                name=line[5] if line[5] else line[4],
+                name=(line[5] if line[5] else line[4]),
                 formula=line[7],
-                line=line,
+                primary_id=primary_id,
+                xrefs=xrefs,
                 pubchem_desc=pubchem_desc,
                 pubchem_mw=pubchem_mw,
-                bigg_mapping=bigg_mapping,
-                id_helper_func=self.parser_helpers.assign_metabolite_primary_id(line),
             )
+
             association_node = self._get_mime_association_node(line)
+
             yield {
                 "_id": f"{self.parser_helpers.get_suffix(subject_node['id'])}_has_metabolic_interaction_with_{self.parser_helpers.get_suffix(object_node['id'])}",
                 "association": association_node,
@@ -1597,9 +1601,45 @@ class GMMAD2Parser(CacheHelper):
                 "subject": subject_node,
             }
 
-    def parse_metabolite_gene(self, in_file):
-        # TODO: implement parsing
-        pass
+    def parse_metabolite_gene(self) -> Iterator[dict]:
+        print("\n--- Parsing Metabolite-Gene Data ---")
+        pubchem_descr = self.load_pickle("gmmad2_meta_gene_description.pkl")
+        pubchem_mw = self.load_pickle("gmmad2_meta_gene_pubchem_mw.pkl")
+        gene_info = self.load_pickle("gmmad2_meta_gene_uniprot_ensemble_info.pkl")
+        bigg_mapping = self.load_pickle("gmmad2_micro_meta_bigg_mapping.pkl")
+        pmid_metadata = self.load_pickle("gmmad2_meta_gene_pmid_metadata.pkl")
+
+        for line in self.csv_parser.line_generator(self.mege_path):
+            mege_id_hierarchy = [
+                (line[3], "PUBCHEM.COMPOUND"),
+                (line[7], "DRUGBANK"),
+                (line[5], "KEGG"),
+                (line[10], "SMILES"),
+                (line[6], "HMDB"),
+                (bigg_mapping.get(line[2].lower()), "BIGG.METABOLITE"),
+            ]
+            primary_id, xrefs = self.parser_helpers.assign_primary_metabolite_id(mege_id_hierarchy)
+
+            subject_node = self._get_metabolite_node(
+                cid=line[3],
+                name=line[2],
+                formula=line[4],
+                primary_id=primary_id,
+                xrefs=xrefs,
+                pubchem_desc=pubchem_descr,
+                pubchem_mw=pubchem_mw,
+            )
+
+            object_node = self._get_gene_node(line, gene_info)
+
+            association_node = self._get_mege_association_node(line, pmid_metadata)
+
+            yield {
+                "_id": f"{self.parser_helpers.get_suffix(subject_node['id'])}_interacts_with_{self.parser_helpers.get_suffix(object_node['id'])}",
+                "association": association_node,
+                "object": object_node,
+                "subject": subject_node,
+            }
 
 
 class DataLoader:
