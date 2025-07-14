@@ -1247,11 +1247,9 @@ class ParserHelper:
 
         xrefs = {}
         primary_id = None
-
         for val, prefix in id_hierarchy:
             if not val or str(val).strip().lower() == "not available":
                 continue
-
             if prefix == "KEGG" and isinstance(val, str):
                 prefix = classify_kegg(val)
 
