@@ -1002,24 +1002,24 @@ class CacheManager(CacheHelper):
         self.save_pickle(existing_data, "gmmad2_pubmed_metadata.pkl")
 
 
-class CombinedCacheManager(CacheHelper):
+class RecordCacheManager(CacheHelper):
     """Manages the creation of a combined cache from individual relationship files."""
 
-    COMBINED_FILENAME = "gmmad2_combined_associations.pkl"
+    COMBINED_FILENAME = "gmmad2_records.pkl"
 
     def __init__(self, cache_dir=None):
         super().__init__(cache_dir)
         print("CombinedCacheManager initialized.")
 
-    def create_combined_cache(self):
+    def cache_combined_associations(self):
         """
         Loads individual relationship caches and combines them into one file.
         """
         print("\nCreating combined relationship cache...")
 
-        self._cache_relationship("microbe-disease")
-        self._cache_relationship("microbe-metabolite")
-        self._cache_relationship("metabolite-gene")
+        self._cache_association("microbe-disease")
+        self._cache_association("microbe-metabolite")
+        self._cache_association("metabolite-gene")
 
         microbe_disease_data = self.load_pickle("microbe-disease.pkl") or {}
         microbe_metabolite_data = self.load_pickle("microbe-metabolite.pkl") or {}
@@ -1035,19 +1035,19 @@ class CombinedCacheManager(CacheHelper):
         print(f"Combined cache created at {self.COMBINED_FILENAME}")
         return combined_data
 
-    def _cache_relationship(self, relationship_name: str):
+    def _cache_association(self, assocation: str):
         """Placeholder to generate and save a single relationship cache."""
-        print(f"-> Generating temporary cache for '{relationship_name}'...")
-        if relationship_name == "microbe-disease":
+        print(f"-> Generating temporary cache for '{assocation}'...")
+        if assocation == "microbe-disease":
             data = {"microbeA": ["diseaseX"], "microbeB": ["diseaseY"]}
-        elif relationship_name == "microbe-metabolite":
+        elif assocation == "microbe-metabolite":
             data = {"microbeA": ["metabolite1"], "microbeC": ["metabolite2"]}
-        elif relationship_name == "metabolite-gene":
+        elif assocation == "metabolite-gene":
             data = {"metabolite1": ["geneZ"], "metabolite2": ["geneW"]}
         else:
             data = {}
 
-        self.save_pickle(data, f"{relationship_name}.pkl")
+        self.save_pickle(data, f"{assocation}.pkl")
 
 
 class DataCachePipeline:
@@ -1643,7 +1643,8 @@ class GMMAD2Parser(CacheHelper):
 
 
 class DataLoader:
-    """Data loaders."""
+    def __init__(self):
+        pass
 
     def load_micro_disease_data(self, f_path):
         # TODO: parse microbe-disease table
