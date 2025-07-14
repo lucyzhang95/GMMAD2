@@ -1153,8 +1153,8 @@ class DataCachePipeline:
         self._cache_mege_chem_properties()
         self._cache_bigg_mapping()
 
-        # self._update_taxon_info()
-        # self._update_taxon_info_with_ncit_descriptions()
+        self._update_taxon_info()
+        self._update_taxon_info_with_ncit_descriptions()
 
         self._verify_taxon_info_cache()
         self._verify_pubchem_cache()
