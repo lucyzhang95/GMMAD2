@@ -1663,5 +1663,8 @@ class DataLoader:
 
 
 if __name__ == "__main__":
-    cache_pipline = DataCachePipeline()
-    cache_pipline.run_cache_pipeline()
+    data_loader = DataLoader()
+    all_gmmad2_recs = data_loader.load_entire_gmmad2_data()
+
+    record_cache_manager = RecordCacheManager()
+    record_cache_manager.cache_combined_associations(data_loader=DataLoader())
