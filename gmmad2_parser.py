@@ -1504,6 +1504,7 @@ class GMMAD2Parser(CacheHelper):
             self.cache_pipeline.run_cache_pipeline()
         taxon_info = self.load_pickle(required_cache)
 
+        rec_ct = 0
         for line in self.csv_parser.line_generator_for_microbe_disease(self.midi_path):
             subject_node = self._get_microbe_node(line[5], line[3], taxon_info)
             object_node = self._get_disease_node(line)
@@ -1514,6 +1515,8 @@ class GMMAD2Parser(CacheHelper):
                 "object": object_node,
                 "subject": subject_node,
             }
+            rec_ct += 1
+        print(f"--- Finished Parsing Microbe-Disease. Generated {rec_ct} records. ---")
 
     def parse_microbe_metabolite(self) -> Iterator[dict]:
         print("\n--- Parsing Microbe-Metabolite Data ---")
@@ -1522,6 +1525,7 @@ class GMMAD2Parser(CacheHelper):
         pubchem_mw = self.load_pickle("gmmad2_pubchem_mw.pkl")
         bigg_mapping = self.load_pickle("gmmad2_bigg_metabolite_mapping.pkl")
 
+        rec_ct = 0
         for line in self.csv_parser.line_generator(self.mime_path):
             taxid = (
                 line[9]
@@ -1558,6 +1562,8 @@ class GMMAD2Parser(CacheHelper):
                 "object": object_node,
                 "subject": subject_node,
             }
+            rec_ct += 1
+        print(f"--- Finished Parsing Microbe-Metabolite. Generated {rec_ct} records. ---")
 
     def parse_metabolite_gene(self) -> Iterator[dict]:
         print("\n--- Parsing Metabolite-Gene Data ---")
@@ -1567,6 +1573,7 @@ class GMMAD2Parser(CacheHelper):
         bigg_mapping = self.load_pickle("gmmad2_bigg_metabolite_mapping.pkl")
         pmid_metadata = self.load_pickle("gmmad2_pubmed_metadata.pkl")
 
+        rec_ct = 0
         for line in self.csv_parser.line_generator(self.mege_path):
             mege_id_hierarchy = [
                 (line[3], "PUBCHEM.COMPOUND"),
@@ -1598,6 +1605,8 @@ class GMMAD2Parser(CacheHelper):
                 "object": object_node,
                 "subject": subject_node,
             }
+            rec_ct += 1
+        print(f"--- Finished Parsing Metabolite-Gene. Generated {rec_ct} records. ---")
 
 
 class RecordCacheManager(CacheHelper):
