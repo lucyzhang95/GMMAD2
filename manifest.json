@@ -34,7 +34,7 @@
     "release": "version:get_release"
   },
   "uploader": {
-    "parser": "gmmad2_parser:DataLoader().load_entire_gmmad2_data",
+    "parser": "GMMAD2_parser:DataLoader().load_entire_gmmad2_data",
     "on_duplicates": "error"
   }
 }
