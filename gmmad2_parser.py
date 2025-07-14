@@ -1330,15 +1330,6 @@ class GMMAD2Parser(CacheHelper):
             }
             node["organism_type"] = self.parser_helpers.get_organism_type(node)
         else:
-            if taxid:
-                self.logger.warning(
-                    f"NCBI taxid '{taxid}' not found in cache. Creating a uuid for microbe node."
-                )
-            else:
-                self.logger.warning(
-                    f"NCBI taxid missing for '{original_name.lower()}'. Using uuid for node id."
-                )
-
             node = {
                 "id": f"uuid:{str(uuid.uuid4())}",
                 "original_name": original_name.lower(),
