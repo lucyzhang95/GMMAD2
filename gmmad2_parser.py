@@ -1,6 +1,7 @@
 import asyncio
 import csv
 import json
+import logging
 import os
 import pickle
 import tarfile
@@ -9,7 +10,7 @@ import uuid
 import zipfile
 from collections import Counter
 from pathlib import Path
-from typing import Dict, Iterator, List
+from typing import Callable, Dict, Iterator, List
 
 import aiohttp
 import biothings_client as bt
@@ -1288,7 +1289,7 @@ class ParserHelper:
 
         return primary_id, xrefs
 
-    def assign_primary_gene_id(line):
+    def assign_primary_gene_id(self, line):
         ensembl_id = line[13]
         ncbi_id = line[14]
         hgnc_id = line[15]
@@ -1349,12 +1350,12 @@ class GMMAD2Parser(CacheHelper):
     def __init__(
         self,
         csv_parser: CSVParser,
-        cache_pipeline: DataCachePipeline,
+        cache_pipeline: DataCachePipeline,  # require CacheManager and CacheHelper
         parser_helpers: ParserHelper,
-        cache_dir = "cache",
-        downloads_dir = "downloads",
+        cache_dir="cache",
+        downloads_dir="downloads",
     ):
-        super().__init__(cache_dir) # inherit from CacheHelper
+        super().__init__(cache_dir)  # inherit from CacheHelper
         self.csv_parser = csv_parser
         self.cache_pipeline = cache_pipeline
         self.parser_helpers = parser_helpers
@@ -1363,86 +1364,219 @@ class GMMAD2Parser(CacheHelper):
         self.mime_path = os.path.join(downloads_dir, "micro_metabolic.csv")
         self.mege_path = os.path.join(downloads_dir, "meta_gene_net.csv")
 
+        self.logger = logging.getLogger(__name__)
+        logging.basicConfig(level=logging.INFO)
+
+    def _get_disease_node(self, line: list) -> dict:
+        node = {
+            "id": f"MESH:{line[1]}",
+            "name": line[2].lower(),
+            "type": "biolink:Disease",
+            "description": line[18],
+            "xrefs": {"mesh": f"MESH:{line[1]}"},
+        }
+        return self.parser_helpers.remove_empty_none_values(node)
+
+    def _get_microbe_node(self, taxid: str, original_name: str, taxon_info: dict) -> dict:
+        if taxid in taxon_info:
+            info = taxon_info[taxid]
+            node = {
+                "id": f"NCBITaxon:{info.get('_id')}",
+                "taxid": int(info.get("_id")) if info.get("_id") else None,
+                "name": info.get("scientific_name", "").lower(),
+                "original_name": original_name.lower(),
+                "description": info.get("description"),
+                "parent_taxid": info.get("parent_taxid"),
+                "lineage": info.get("lineage", []),
+                "rank": info.get("rank"),
+                "type": "biolink:OrganismTaxon",
+                "xrefs": info.get("xrefs", {}),
+            }
+            node["organism_type"] = self.parser_helpers.get_organism_type(node)
+        else:
+            self.logger.warning(
+                f"NCBI taxid '{taxid}' not found in cache. Creating a uuid for microbe node."
+            )
+
+            node = {
+                "id": str(uuid.uuid4()),
+                "original_name": original_name.lower(),
+                "type": "biolink:OrganismTaxon",
+                "organism_type": "Other",
+            }
+        return self.parser_helpers.remove_empty_none_values(node)
+
+    def _get_metabolite_node(
+        self,
+        cid: str,
+        name: str,
+        formula: str,
+        line: list,
+        pubchem_desc: dict,
+        pubchem_mw: dict,
+        bigg_mapping: dict,
+        id_helper_func: Callable,
+    ) -> dict:
+        node = {
+            "id": None,
+            "name": name.lower(),
+            "synonym": pubchem_desc.get(cid, {}).get("synonyms", []),
+            "description": pubchem_desc.get(cid, {}).get("description", ""),
+            "chemical_formula": formula if formula and formula != "not available" else None,
+            "molecular_weight": pubchem_mw.get(cid, {}).get("molecular_weight", {}),
+            "xlogp": pubchem_mw.get(cid, {}).get("xlogp", None),
+            "type": "biolink:SmallMolecule",
+        }
+        id_xrefs = id_helper_func(line, bigg_mapping)
+        if id_xrefs:
+            primary_id, xrefs = id_xrefs
+        else:
+            primary_id, xrefs = None, {}
+        node["id"] = primary_id if primary_id else str(uuid.uuid4())
+        node["xrefs"] = xrefs
+        return self.parser_helpers.remove_empty_none_values(node)
+
+    def _get_gene_node(self, line: list, protein_and_gene_info: dict) -> dict:
+        uniprot_id = line[16] if line[16] and line[16] != "Not available" else None
+        ensemble = line[13] if line[13] and line[13] != "Not available" else None
+        gene_record = (protein_and_gene_info.get(uniprot_id) if uniprot_id else None) or (
+            protein_and_gene_info.get(ensemble) if ensemble else None
+        )
+
+        node = {
+            "id": f"UniProtKB:{uniprot_id}" if uniprot_id else f"ENSEMBL:{ensemble}",
+            "name": gene_record.get("name") if gene_record else None,
+            "full_name": gene_record.get("full_name") if gene_record else None,
+            "original_name": line[12],
+            "description": (
+                line[18]
+                if line[18] and line[18] != "Not available"
+                else gene_record.get("description")
+                if gene_record
+                else None
+            ),
+            "residue_num": int(line[17]) if line[17] else None,
+            "type": "biolink:Protein",
+        }
+        _, gene_xrefs = self.parser_helpers.assign_primary_gene_id(line)
+        node["xrefs"] = gene_xrefs
+        return self.parser_helpers.remove_empty_none_values(node)
+
+    def _get_midi_association_node(self, line: list) -> dict:
+        node = {
+            "predicate": "OrganismalEntityAsAModelOfDiseaseAssociation",
+            "type": "biolink:associated_with",
+            "qualifier": line[17].lower(),
+            "qualifier_ratio": float(line[16]) if line[16] else None,
+            "disease_sample_size": int(line[6]) if line[6] else None,
+            "disease_abundance_mean": float(line[7]) if line[7] else None,
+            "disease_abundance_median": float(line[8]) if line[8] else None,
+            "disease_abundance_sd": float(line[9]) if line[9] else None,
+            "control_id": line[10],
+            "control_name": line[11].lower(),
+            "healthy_sample_size": int(line[12]) if line[12] else None,
+            "healthy_abundance_mean": float(line[13]) if line[13] else None,
+            "healthy_abundance_median": float(line[14]) if line[14] else None,
+            "healthy_abundance_sd": float(line[15]) if line[15] else None,
+            "primary_knowledge_source": "infores:GMrepo",
+            "aggregator_knowledge_source": "infores:GMMAD2",
+            "evidence_type": "ECO:0000221",  # high throughput nucleotide sequencing assay evidence
+        }
+        return self.parser_helpers.remove_empty_none_values(node)
+
+    def _get_mime_association_node(self, line: list) -> dict:
+        evidence_map = {
+            "infores:wom": "ECO:0001230",  # mass spec + manual
+            "infores:vmh": "ECO:0000218",  # manual assertion
+            "infores:gutMGene": "ECO:0000218",  # manual assertion
+            "infores:Metabolomics": "ECO:0001230",  # mass spec + manual
+        }
+        src = f"infores:{line[17].strip()}"
+        habitat = (
+            [h.strip().lower() for h in line[20].split(";")]
+            if line[20] and line[20] != "Unknown"
+            else None
+        )
+        node = {
+            "predicate": "biolink:OrganismTaxonToChemicalEntityAssociation",
+            "type": "has_metabolic_interaction_with",
+            "association_habitat": habitat,
+            "primary_knowledge_source": src,
+            "aggregator_knowledge_source": "infores:GMMAD2",
+            "evidence_type": evidence_map.get(src, "ECO:0000000"),
+        }
+        return self.parser_helpers.remove_empty_none_values(node)
+
+    def _create_mege_association_node(self, line: list, pmid_metadata: dict) -> dict:
+        habitat = (
+            [h.strip().lower() for h in line[9].split(";")]
+            if line[9] and line[9] != "Unknown"
+            else None
+        )
+        srcs = (
+            [f"infores:{src.strip()}" for src in line[22].split(",")]
+            if "," in line[22]
+            else f"infores:{line[22].lower().strip()}"
+        )
+        evidence_map = {
+            "infores:stitch": "ECO:0007669",  # computational evidence used in automatic assertion
+            "infores:drugbank": "ECO:0000269",  # experimental evidence used in manual assertion
+            "infores:gutMGene": "ECO:0000218",  # manual assertion
+        }
+        if isinstance(srcs, list):
+            ecos = [evidence_map.get(s, "ECO:0000000") for s in srcs]
+            evidence_type = ecos if len(ecos) > 1 else ecos[0]
+        else:
+            evidence_type = evidence_map.get(srcs, "ECO:0000000")
+
+        pmid_key = line[21]
+        metadata = pmid_metadata.get(pmid_key) if pmid_key and pmid_key != "Not available" else None
+
+        node = {
+            "id": "RO:0002434",
+            "predicate": "biolink:ChemicalGeneInteractionAssociation",
+            "type": "interacts_with",
+            "association_habitat": habitat,
+            "score": float(line[19]) if line[19] and line[19] != "Not available" else None,
+            "qualifier": (
+                "decrease"
+                if line[20] and "reduced" in line[20].lower()
+                else "increase"
+                if line[20] and "elevated" in line[20].lower()
+                else line[20].lower()
+                if line[20]
+                else None
+            ),
+            "primary_knowledge_source": srcs,
+            "aggregator_knowledge_source": "infores:GMMAD2",
+            "evidence_type": evidence_type,
+            "publications": {
+                "pmid": int(line[21]) if line[21] and line[21] != "Not available" else None,
+                "type": "biolink:Publication",
+                "summary": metadata.get("summary") if metadata else None,
+                "name": metadata.get("name") if metadata else None,
+                "doi": metadata.get("doi") if metadata else None,
+            },
+        }
+        return self.parser_helpers.remove_empty_none_values(node)
+
     def parse_microbe_disease(self):
-        required_cache_f_name = "gmmad2_taxon_info.pkl"
-        if not os.path.exists(self._get_path(required_cache_f_name)):
-            print(f"'{required_cache_f_name}' not found. Running cache pipeline...")
+        print("\n--- Parsing Microbe-Disease Data ---")
+        required_cache = "gmmad2_taxon_info.pkl"
+        if not os.path.exists(self._get_path(required_cache)):
             self.cache_pipeline.run_cache_pipeline()
+        taxon_info = self.load_pickle(required_cache)
 
-        taxon_info = self.load_pickle(required_cache_f_name)
         for line in self.csv_parser.line_generator_for_microbe_disease(self.midi_path):
-            subject_node = {}
-
-            object_node = {
-                "id": f"MESH:{line[1]}",
-                "name": line[2].lower(),
-                "type": "biolink:Disease",
-                "description": line[18],
-                "xrefs": {"mesh": f"MESH:{line[1]}"},
-            }
-            object_node = self.parser_helpers.remove_empty_none_values(object_node)
-
-            taxid = line[5]
-            if taxid in taxon_info:
-                info = taxon_info[taxid]
-                subject_node = {
-                    "id": f"NCBITaxon:{info.get('_id')}",
-                    "taxid": int(info.get("_id")) if info.get("_id") else None,
-                    "name": info.get("scientific_name", "").lower(),
-                    "original_name": line[3].lower(),
-                    "description": info.get("description"),
-                    "parent_taxid": info.get("parent_taxid"),
-                    "lineage": info.get("lineage", []),
-                    "rank": info.get("rank"),
-                    "type": "biolink:OrganismTaxon",
-                    "organism_type": None,
-                    "xrefs": info.get("xrefs", {}),
-                }
-                subject_node["organism_type"] = self.parser_helpers.get_organism_type(subject_node)
-                subject_node = self.parser_helpers.remove_empty_none_values(subject_node)
-            else:
-                subject_node["id"] = line[5] if line[5]
-                subject_node["original_name"] = line[3].lower(),
-                subject_node["type"] = "biolink:OrganismTaxon",
-
-
-
-            association_node = {
-                "predicate": "OrganismalEntityAsAModelOfDiseaseAssociation",
-                "type": "biolink:associated_with",
-                "qualifier": line[17].lower(),
-                "qualifier_ratio": float(line[16]) if line[16] else None,
-                "disease_sample_size": int(line[6]) if line[6] else None,
-                "disease_abundance_mean": float(line[7]) if line[7] else None,
-                "disease_abundance_median": float(line[8]) if line[8] else None,
-                "disease_abundance_sd": float(line[9]) if line[9] else None,
-                "control_id": line[10],
-                "control_name": line[11].lower(),
-                "healthy_sample_size": int(line[12]) if line[12] else None,
-                "healthy_abundance_mean": float(line[13]) if line[13] else None,
-                "healthy_abundance_median": float(line[14]) if line[14] else None,
-                "healthy_abundance_sd": float(line[15]) if line[15] else None,
-                "primary_knowledge_source": "infores:GMrepo",
-                "aggregator_knowledge_source": "infores:GMMAD2",
-                "evidence_type": "ECO:0000221",
-            }
-            association_node = self.parser_helpers.remove_empty_none_values(association_node)
-
+            subject_node = self._get_microbe_node(line[5], line[3], taxon_info)
+            object_node = self._get_disease_node(line)
+            association_node = self._get_midi_association_node(line)
             yield {
-                "_id": f"{subject_node.get('id', 'unknown').split(':')[1]}_associated_with_{object_node.get('id', 'unknown').split(':')[1]}",
+                "_id": f"{self.parser_helpers.get_suffix(subject_node['id'])}_associated_with_{self.parser_helpers.get_suffix(object_node['id'])}",
                 "association": association_node,
                 "object": object_node,
                 "subject": subject_node,
             }
-
-
-
-
-
-
-
-
-
 
     def parse_microbe_metabolite(self, in_file):
         # TODO: implement parsing
