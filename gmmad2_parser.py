@@ -1361,7 +1361,9 @@ class GMMAD2Parser(CacheHelper):
     ) -> dict:
 
         node = {
-            "id": primary_id if primary_id else str(uuid.uuid4()),
+            "id": primary_id
+            if primary_id
+            else str(uuid.uuid4()),  # use uuid if no primary id but hash compound name
             "name": name.lower(),
             "synonym": pubchem_desc.get(cid, {}).get("synonyms", []),
             "description": pubchem_desc.get(cid, {}).get("description", ""),
