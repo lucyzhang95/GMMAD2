@@ -1338,7 +1338,7 @@ class GMMAD2Parser(CacheHelper):
                 )
             else:
                 self.logger.warning(
-                    f"NCBI taxid missing for '{original_name}'. Using uuid for node id."
+                    f"NCBI taxid missing for '{original_name.lower()}'. Using uuid for node id."
                 )
 
             node = {
@@ -1561,11 +1561,11 @@ class GMMAD2Parser(CacheHelper):
 
     def parse_metabolite_gene(self) -> Iterator[dict]:
         print("\n--- Parsing Metabolite-Gene Data ---")
-        pubchem_descr = self.load_pickle("gmmad2_meta_gene_description.pkl")
-        pubchem_mw = self.load_pickle("gmmad2_meta_gene_pubchem_mw.pkl")
-        gene_info = self.load_pickle("gmmad2_meta_gene_uniprot_ensemble_info.pkl")
-        bigg_mapping = self.load_pickle("gmmad2_micro_meta_bigg_mapping.pkl")
-        pmid_metadata = self.load_pickle("gmmad2_meta_gene_pmid_metadata.pkl")
+        pubchem_descr = self.load_pickle("gmmad2_pubchem_descriptions.pkl")
+        pubchem_mw = self.load_pickle("gmmad2_pubchem_mw.pkl")
+        gene_info = self.load_pickle("gmmad2_protein_gene_combined_info.pkl")
+        bigg_mapping = self.load_pickle("gmmad2_bigg_metabolite_mapping.pkl")
+        pmid_metadata = self.load_pickle("gmmad2_pubmed_metadata.pkl")
 
         for line in self.csv_parser.line_generator(self.mege_path):
             mege_id_hierarchy = [
