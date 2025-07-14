@@ -1340,7 +1340,7 @@ class GMMAD2Parser(CacheHelper):
                 )
 
             node = {
-                "id": str(uuid.uuid4()),
+                "id": f"uuid:{str(uuid.uuid4())}",
                 "original_name": original_name.lower(),
                 "type": "biolink:OrganismTaxon",
                 "organism_type": "Other",
@@ -1361,7 +1361,7 @@ class GMMAD2Parser(CacheHelper):
         node = {
             "id": primary_id
             if primary_id
-            else str(uuid.uuid4()),  # use uuid if no primary id but hash compound name
+            else f"uuid:{str(uuid.uuid4())}",  # use uuid if no primary id but has compound name
             "name": name.lower(),
             "synonym": pubchem_desc.get(cid, {}).get("synonyms", []),
             "description": pubchem_desc.get(cid, {}).get("description", ""),
