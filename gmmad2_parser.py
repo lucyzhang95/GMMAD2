@@ -1200,6 +1200,7 @@ class DataCachePipeline:
         self._cache_mege_pubmed_metadata()
         self._cache_mime_chem_properties()
         self._cache_mege_chem_properties()
+        self._cache_bigg_mapping()
 
         # self._update_taxon_info()
         # self._update_taxon_info_with_ncit_descriptions()
@@ -1234,29 +1235,13 @@ class ParserHelper:
     def get_suffix(self, identifier: str) -> str:
         return identifier.split(":", 1)[1].strip() if ":" in identifier else identifier.strip()
 
-    def assign_metabolite_primary_id(self, line, bigg_map):
-        # TODO: the fields are different in microbe-metabolite and metabolite-gene
-        pubchem_id = line[6]
-        kegg_id = line[8]
-        smiles = line[18]
-        hmdb_id = line[19]
-        bigg_id = bigg_map.get(line[5].lower())
-
-        # (line, prefix) pairs for ID hierarchy
-        id_hierarchy = [
-            (pubchem_id, "PUBCHEM.COMPOUND"),
-            (kegg_id, None),
-            (smiles, ""),
-            (hmdb_id, "HMDB"),
-            (bigg_id, "BIGG.METABOLITE"),
-        ]
-
+    def assign_primary_metabolite_id(self, id_hierarchy: List[tuple]) -> tuple[str, dict] or None:
         def classify_kegg(val):
             if val.startswith("C"):
                 return "KEGG.COMPOUND"
-            elif val.startswith("G"):
+            if val.startswith("G"):
                 return "KEGG.GLYCAN"
-            elif val.startswith("D"):
+            if val.startswith("D"):
                 return "KEGG.DRUG"
             return "KEGG"
 
@@ -1264,23 +1249,25 @@ class ParserHelper:
         primary_id = None
 
         for val, prefix in id_hierarchy:
-            if not val or val.strip().lower() == "not available":
+            if not val or str(val).strip().lower() == "not available":
                 continue
-            if prefix is None and val == kegg_id:
+
+            if prefix == "KEGG" and isinstance(val, str):
                 prefix = classify_kegg(val)
 
-            curie = f"{prefix}:{val}" if prefix else val
-            if prefix == "PUBCHEM.COMPOUND":
-                key = "pubchem_cid"
-            elif prefix == "HMDB":
-                key = "hmdb"
-            elif prefix is not None and prefix.startswith("KEGG"):
-                key = "kegg"
-            elif prefix == "":
-                key = "smiles"
-            elif prefix == "BIGG.METABOLITE":
-                key = "bigg"
-            else:
+            curie = f"{prefix}:{val}" if prefix else str(val)
+            key_map = {
+                "PUBCHEM.COMPOUND": "pubchem_cid",
+                "DRUGBANK": "drugbank",
+                "HMDB": "hmdb",
+                "SMILES": "smiles",
+                "BIGG.METABOLITE": "bigg",
+                "KEGG.COMPOUND": "kegg",
+                "KEGG.GLYCAN": "kegg",
+                "KEGG.DRUG": "kegg",
+            }
+            key = key_map.get(prefix)
+            if not key:
                 continue
 
             if primary_id is None:
@@ -1560,7 +1547,7 @@ class GMMAD2Parser(CacheHelper):
         }
         return self.parser_helpers.remove_empty_none_values(node)
 
-    def parse_microbe_disease(self):
+    def parse_microbe_disease(self) -> Iterator[dict]:
         print("\n--- Parsing Microbe-Disease Data ---")
         required_cache = "gmmad2_taxon_info.pkl"
         if not os.path.exists(self._get_path(required_cache)):
@@ -1578,9 +1565,39 @@ class GMMAD2Parser(CacheHelper):
                 "subject": subject_node,
             }
 
-    def parse_microbe_metabolite(self, in_file):
-        # TODO: implement parsing
-        pass
+    def parse_microbe_metabolite(self) -> Iterator[dict]:
+        print("\n--- Parsing Microbe-Metabolite Data ---")
+        taxon_cache = self.load_pickle("gmmad2_taxon_info.pkl")
+        pubchem_desc = self.load_pickle("gmmad2_pubchem_descriptions.pkl")
+        pubchem_mw = self.load_pickle("gmmad2_pubchem_mw.pkl")
+        bigg_mapping = self.load_pickle("gmmad2_bigg_metabolite_mapping.pkl")
+
+        for line in self.csv_parser.line_generator(self.mime_path):
+            taxid = (
+                line[9]
+                if line[9] and line[9] != "not available"
+                else line[16]
+                if line[16] and line[16] != "not available"
+                else None
+            )
+            subject_node = self._get_microbe_node(taxid, line[2], taxon_cache)
+            object_node = self._get_metabolite_node(
+                cid=line[6],
+                name=line[5] if line[5] else line[4],
+                formula=line[7],
+                line=line,
+                pubchem_desc=pubchem_desc,
+                pubchem_mw=pubchem_mw,
+                bigg_mapping=bigg_mapping,
+                id_helper_func=self.parser_helpers.assign_metabolite_primary_id(line),
+            )
+            association_node = self._get_mime_association_node(line)
+            yield {
+                "_id": f"{self.parser_helpers.get_suffix(subject_node['id'])}_has_metabolic_interaction_with_{self.parser_helpers.get_suffix(object_node['id'])}",
+                "association": association_node,
+                "object": object_node,
+                "subject": subject_node,
+            }
 
     def parse_metabolite_gene(self, in_file):
         # TODO: implement parsing
