@@ -1516,7 +1516,7 @@ class GMMAD2Parser(CacheHelper):
                 "subject": subject_node,
             }
             rec_ct += 1
-        print(f"--- Finished Parsing Microbe-Disease. Generated {rec_ct} records. ---")
+        print(f"--- Finished Parsing Microbe-Disease. Generated {rec_ct} records. ---\n")
 
     def parse_microbe_metabolite(self) -> Iterator[dict]:
         print("\n--- Parsing Microbe-Metabolite Data ---")
@@ -1563,7 +1563,7 @@ class GMMAD2Parser(CacheHelper):
                 "subject": subject_node,
             }
             rec_ct += 1
-        print(f"--- Finished Parsing Microbe-Metabolite. Generated {rec_ct} records. ---")
+        print(f"--- Finished Parsing Microbe-Metabolite. Generated {rec_ct} records. ---\n")
 
     def parse_metabolite_gene(self) -> Iterator[dict]:
         print("\n--- Parsing Metabolite-Gene Data ---")
@@ -1606,7 +1606,7 @@ class GMMAD2Parser(CacheHelper):
                 "subject": subject_node,
             }
             rec_ct += 1
-        print(f"--- Finished Parsing Metabolite-Gene. Generated {rec_ct} records. ---")
+        print(f"--- Finished Parsing Metabolite-Gene. Generated {rec_ct} records. ---\n")
 
 
 class RecordCacheManager(CacheHelper):
