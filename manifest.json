@@ -6,7 +6,8 @@
     "license": "Creative Commons Attribution 4.0 International License (CC BY 4.0)",
     "source_last_modified": "04/20/2025",
     "source_download_date": "07/07/2025",
-     "source_last_parsed": "07/23/2025"
+    "source_format": "csv",
+    "source_last_ingested": "07/23/2025"
 
   },
   "display_name": "GMMAD2",
@@ -30,7 +31,7 @@
       "http://gepa.org.cn/static2/file/meta_gene_net.csv",
       "http://bigg.ucsd.edu/static/namespace/bigg_models_metabolites.txt"
     ],
-    "uncompress" : false,
+    "uncompress": false,
     "release": "version:get_release"
   },
   "uploader": {
