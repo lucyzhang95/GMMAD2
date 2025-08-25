@@ -27,6 +27,7 @@ class RecordCacheManager(CacheHelper):
         self.save_json(combined_data, f"{self.COMBINED_FILENAME}.json")
         total_records = sum(len(v) for v in combined_data.values())
         print(
-            f"Full GMMAD2 association record cache with {total_records} records created at {self.COMBINED_FILENAME}"
+            f"🎉Full GMMAD2 association record cache with {total_records} records saved at {self.cache_dir}."
         )
+        print("Finished.\n")
         return combined_data
