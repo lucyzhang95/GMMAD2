@@ -20,67 +20,7 @@ from dotenv import load_dotenv
 from ete3 import NCBITaxa
 from tqdm.asyncio import tqdm
 
-
-class CSVParser:
-    """Lightweight generator for large CSV/TXT tables."""
-
-    def line_generator(
-        self, in_file: str | os.PathLike, delimiter=",", skip_header=True
-    ) -> Iterator[list]:
-        """Generates lines from a CSV file, yielding each line as a list of strings
-        This function opens the specified CSV file, skips the header row, and yields each following line as a list of strings.
-
-        :param skip_header:
-        :param in_file: The path to the CSV file.
-        :param delimiter: The character used to separate values in the CSV file (default is comma).
-        :return: An iterator that yields each line of the CSV file as a list of strings.
-        """
-        with open(in_file, "r") as in_f:
-            reader = csv.reader(in_f, delimiter=delimiter)
-            if skip_header:
-                next(reader)
-            else:
-                pass
-
-            for line in reader:
-                yield line
-
-    def line_generator_for_microbe_disease(
-        self, in_file: str | os.PathLike, skip_header=True
-    ) -> Iterator[list[str]]:
-        """Yield each CSV line as a list of exactly 24 fields, specially handling disease_species.csv
-        rejoining misaligned columns with commas for the 'disease' and 'disease_info' columns.
-        """
-        EXPECTED_COUNT = 24
-        HEAD_COUNT = 2
-        TAIL_COUNT = 5
-        FIXED_COUNT = 15
-
-        with open(in_file, "r", encoding="utf-8") as f:
-            if skip_header:
-                next(f)
-            else:
-                pass
-
-            for line in f:
-                parts = [part.strip() for part in line.split(",")]
-                if len(parts) == EXPECTED_COUNT:
-                    yield parts
-                else:
-                    alteration_idx = next(
-                        i for i, p in enumerate(parts) if p in ("Increase", "Decrease")
-                    )
-                    head = parts[:HEAD_COUNT]
-                    fixed_start = alteration_idx - (FIXED_COUNT - 1)
-                    disease = ",".join(parts[2:fixed_start])
-                    fixed = parts[fixed_start : alteration_idx + 1]
-                    disease_info = ",".join(parts[alteration_idx + 1 : len(parts) - TAIL_COUNT])
-                    tail = parts[-TAIL_COUNT:]
-                    new_line = head + [disease] + fixed + [disease_info] + tail
-                    assert (
-                        len(new_line) == EXPECTED_COUNT
-                    ), f"Expected {EXPECTED_COUNT} cols, got {len(new_line)}"
-                    yield new_line
+from utils.reader import CSVReader
 
 
 class NCBITaxonomyService:
@@ -525,13 +465,13 @@ class BiGGParser:
     """BiGG metabolite mapping helper."""
 
     def __init__(self):
-        self.csv_parser = CSVParser()
+        self.csv_reader = CSVReader()
 
     def get_bigg_metabolite_mapping(
         self, in_f: str | os.PathLike, delimiter: str = "\t", skip_header: bool = True
     ) -> Dict[str, str]:
         bigg_map: Dict[str, str] = {}
-        for fields in self.csv_parser.line_generator(
+        for fields in self.csv_reader.line_generator(
             in_f, delimiter=delimiter, skip_header=skip_header
         ):
             bigg_id = fields[1].strip()
@@ -1008,13 +948,13 @@ class DataCachePipeline:
         self.midi_path = os.path.join(self.downloads_dir, "disease_species.csv")
         self.mime_path = os.path.join(self.downloads_dir, "micro_metabolic.csv")
         self.mege_path = os.path.join(self.downloads_dir, "meta_gene_net.csv")
-        self.csv_parser = CSVParser()
+        self.csv_reader = CSVReader()
         self.cache_manager = CacheManager(cache_dir=self.cache_dir)
         print("Data Cache Pipeline initialized...")
 
     def _cache_midi_taxon_info(self):
         taxids = [
-            line[5] for line in self.csv_parser.line_generator_for_microbe_disease(self.midi_path)
+            line[5] for line in self.csv_reader.line_generator_for_microbe_disease(self.midi_path)
         ]
         self.cache_manager.cache_entity("taxon_info", taxids=taxids)
 
@@ -1025,7 +965,7 @@ class DataCachePipeline:
             else line[16]
             if (line[16] and line[16] != "not available")
             else None
-            for line in self.csv_parser.line_generator(self.mime_path)
+            for line in self.csv_reader.line_generator(self.mime_path)
         ]
         taxids = [t for t in taxids if t]
         self.cache_manager.cache_entity("taxon_info", taxids=taxids)
@@ -1046,7 +986,7 @@ class DataCachePipeline:
     def _cache_mime_pubchem_descriptions(self):
         pubchem_cids = [
             line[6]
-            for line in self.csv_parser.line_generator(self.mime_path)
+            for line in self.csv_reader.line_generator(self.mime_path)
             if line[6] and line[6] != "not available"
         ]
         self.cache_manager.cache_entity("pubchem_description", cids=pubchem_cids)
@@ -1054,7 +994,7 @@ class DataCachePipeline:
     def _cache_mege_pubchem_descriptions(self):
         pubchem_cids = [
             line[3]
-            for line in self.csv_parser.line_generator(self.mege_path)
+            for line in self.csv_reader.line_generator(self.mege_path)
             if line[3] and line[3] != "Not available"
         ]
         self.cache_manager.cache_entity("pubchem_description", cids=pubchem_cids)
@@ -1073,7 +1013,7 @@ class DataCachePipeline:
             else line[13]
             if line[13] and line[13] != "Not available"
             else None
-            for line in self.csv_parser.line_generator(self.mege_path)
+            for line in self.csv_reader.line_generator(self.mege_path)
         ]
         gene_ids = list(set(gene_ids))
         uniprot_ids = [_id for _id in gene_ids if "ENSG" not in _id]
@@ -1095,7 +1035,7 @@ class DataCachePipeline:
     def _cache_mege_pubmed_metadata(self):
         pmids = [
             line[21]
-            for line in self.csv_parser.line_generator(self.mege_path)
+            for line in self.csv_reader.line_generator(self.mege_path)
             if line[21] and line[21] != "Not available"
         ]
         self.cache_manager.cache_entity("pubmed_metadata", pmids=pmids)
@@ -1110,7 +1050,7 @@ class DataCachePipeline:
     def _cache_mime_chem_properties(self):
         pubchem_cids = [
             line[6]
-            for line in self.csv_parser.line_generator(self.mime_path)
+            for line in self.csv_reader.line_generator(self.mime_path)
             if line[6] and line[6] != "not available"
         ]
         self.cache_manager.cache_entity("pubchem_mw", cids=pubchem_cids)
@@ -1118,7 +1058,7 @@ class DataCachePipeline:
     def _cache_mege_chem_properties(self):
         pubchem_cids = [
             line[3]
-            for line in self.csv_parser.line_generator(self.mege_path)
+            for line in self.csv_reader.line_generator(self.mege_path)
             if line[3] and line[3] != "Not available"
         ]
         self.cache_manager.cache_entity("pubchem_mw", cids=pubchem_cids)
@@ -1285,14 +1225,14 @@ class GMMAD2Parser(CacheHelper):
 
     def __init__(
         self,
-        csv_parser: CSVParser,
+        csv_reader: CSVReader,
         cache_pipeline: DataCachePipeline,  # require CacheManager and CacheHelper
         parser_helpers: ParserHelper,
         cache_dir="cache",
         downloads_dir="downloads",
     ):
         super().__init__(cache_dir)  # inherit from CacheHelper
-        self.csv_parser = csv_parser
+        self.csv_reader = csv_reader
         self.cache_pipeline = cache_pipeline
         self.parser_helpers = parser_helpers
 
@@ -1496,7 +1436,7 @@ class GMMAD2Parser(CacheHelper):
         taxon_info = self.load_pickle(required_cache)
 
         rec_ct = 0
-        for line in self.csv_parser.line_generator_for_microbe_disease(self.midi_path):
+        for line in self.csv_reader.line_generator_for_microbe_disease(self.midi_path):
             subject_node = self._get_microbe_node(line[5], line[3], taxon_info)
             object_node = self._get_disease_node(line)
             association_node = self._get_midi_association_node(line)
@@ -1517,7 +1457,7 @@ class GMMAD2Parser(CacheHelper):
         bigg_mapping = self.load_pickle("gmmad2_bigg_metabolite_mapping.pkl")
 
         rec_ct = 0
-        for line in self.csv_parser.line_generator(self.mime_path):
+        for line in self.csv_reader.line_generator(self.mime_path):
             taxid = (
                 line[9]
                 if line[9] and line[9] != "not available"
@@ -1565,7 +1505,7 @@ class GMMAD2Parser(CacheHelper):
         pmid_metadata = self.load_pickle("gmmad2_pubmed_metadata.pkl")
 
         rec_ct = 0
-        for line in self.csv_parser.line_generator(self.mege_path):
+        for line in self.csv_reader.line_generator(self.mege_path):
             mege_id_hierarchy = [
                 (line[3], "PUBCHEM.COMPOUND"),
                 (line[7], "DRUGBANK"),
@@ -1632,12 +1572,12 @@ class RecordCacheManager(CacheHelper):
 
 class DataLoader:
     def __init__(self, cache_dir="cache", downloads_dir="downloads"):
-        csv_parser = CSVParser()
+        csv_reader = CSVReader()
         cache_pipeline = DataCachePipeline()
         parser_helpers = ParserHelper()
 
         self.parser = GMMAD2Parser(
-            csv_parser=csv_parser,
+            csv_reader=csv_reader,
             cache_pipeline=cache_pipeline,
             parser_helpers=parser_helpers,
             cache_dir=cache_dir,
