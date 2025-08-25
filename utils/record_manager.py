@@ -4,7 +4,7 @@ from utils.cache_manager import CacheHelper
 class RecordCacheManager(CacheHelper):
     """Manages the creation of a combined cache from individual relationship files."""
 
-    COMBINED_FILENAME_PKL = "gmmad2_parsed_records.pkl"
+    COMBINED_FILENAME = "gmmad2_parsed_records"
 
     def __init__(self, cache_dir=None):
         super().__init__(cache_dir)
@@ -23,9 +23,10 @@ class RecordCacheManager(CacheHelper):
             "metabolite-gene": list(data_loader.load_metabolite_gene_data()),
         }
 
-        self.save_pickle(combined_data, self.COMBINED_FILENAME_PKL)
+        self.save_pickle(combined_data, f"{self.COMBINED_FILENAME}.pkl")
+        self.save_json(combined_data, f"{self.COMBINED_FILENAME}.json")
         total_records = sum(len(v) for v in combined_data.values())
         print(
-            f"Full GMMAD2 association record cache with {total_records} records created at {self.COMBINED_FILENAME_PKL}"
+            f"Full GMMAD2 association record cache with {total_records} records created at {self.COMBINED_FILENAME}"
         )
         return combined_data
