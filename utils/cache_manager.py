@@ -12,6 +12,7 @@ from .ontology_services import (
     PubMedService,
     UniProtService,
 )
+from .parser_helper import ParserHelper
 
 
 class CacheHelper:
@@ -81,6 +82,8 @@ class CacheManager(CacheHelper):
         """Initializes the CacheManager and ensures the cache directory exists."""
         super().__init__(cache_dir)
         self.COMBINED_GENE_CACHE_F_NAME = "gmmad2_protein_gene_combined_info.pkl"
+        self.parser_helper = ParserHelper()
+        self.ncbi_service = NCBITaxonomyService()
 
     def cache_entity(self, entity_type: str, **kwargs):
         """
@@ -130,12 +133,13 @@ class CacheManager(CacheHelper):
             print("✅All requested taxids are already in the cache.")
             return None
 
-        ncbi_service = NCBITaxonomyService()
-        taxon_info = ncbi_service.query_taxon_info_from_biothings(taxids=taxids_to_query)
-        filtered_taxon_info, taxid_notfound = ncbi_service.filter_taxon_info(taxon_info)
+        taxon_info = self.ncbi_service.query_taxon_info_from_biothings(taxids=taxids_to_query)
+        filtered_taxon_info, taxid_notfound = self.parser_helper.filter_taxon_info(taxon_info)
 
         if taxid_notfound:
-            print(f"-> Found {len(taxid_notfound)} taxids that were not found: {taxid_notfound[:5]}")
+            print(
+                f"-> Found {len(taxid_notfound)} taxids that were not found: {taxid_notfound[:5]}"
+            )
             notfound_f_name = "gmmad2_taxon_info_notfound.pkl"
             existing_notfound = self.load_pickle(notfound_f_name) or []
             updated_notfound = sorted(list(set(existing_notfound + taxid_notfound)))
@@ -160,9 +164,8 @@ class CacheManager(CacheHelper):
             print("✅All 'not found' taxids are already in the cache.")
             return
 
-        ncbi_service = NCBITaxonomyService()
-        taxid_map = ncbi_service.get_taxid_mapping_from_ncbi_merged_dmp()
-        new_taxid_map = ncbi_service.get_current_taxid_mapping(
+        taxid_map = self.ncbi_service.get_taxid_mapping_from_ncbi_merged_dmp()
+        new_taxid_map = self.ncbi_service.get_current_taxid_mapping(
             old_taxids=old_taxids_to_process, merged_mapping=taxid_map
         )
 
@@ -181,10 +184,10 @@ class CacheManager(CacheHelper):
 
         new_taxon_info_to_add = {}  # new taxids after remapping
         if new_taxids_to_query:
-            new_taxon_info = ncbi_service.query_taxon_info_from_biothings(
+            new_taxon_info = self.ncbi_service.query_taxon_info_from_biothings(
                 taxids=new_taxids_to_query
             )
-            valid_new_taxon_info, _ = ncbi_service.filter_taxon_info(new_taxon_info)
+            valid_new_taxon_info, _ = self.parser_helper.filter_taxon_info(new_taxon_info)
 
             reverse_map = {v: k for k, v in new_taxid_map.items()}
             for new_id, new_info in valid_new_taxon_info.items():
@@ -256,7 +259,9 @@ class CacheManager(CacheHelper):
                     taxon_info_cache[taxid]["description"] = desc_cache[name]
                     update_count += 1
         if update_count > 0:
-            print(f"⚙️Updated {update_count} entries in the main taxon info cache with descriptions.")
+            print(
+                f"⚙️Updated {update_count} entries in the main taxon info cache with descriptions."
+            )
             print(f"-> Saving '{main_cache_f_name}' with {len(taxon_info_cache)} keys.")
             self.save_pickle(taxon_info_cache, main_cache_f_name)
         else:
