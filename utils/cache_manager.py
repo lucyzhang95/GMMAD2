@@ -256,7 +256,17 @@ class CacheManager(CacheHelper):
             ):
                 name = info["scientific_name"]
                 if name in desc_cache:
-                    taxon_info_cache[taxid]["description"] = desc_cache[name]
+                    desc_dict = desc_cache[name]
+                    taxon_info_cache[taxid]["description"] = (
+                        desc_dict.get("description", "")
+                        if isinstance(desc_dict, dict)
+                        else str(desc_dict)
+                    )
+                    if isinstance(desc_dict, dict) and "xrefs" in desc_dict:
+                        taxon_info_cache[taxid]["xrefs"] = {
+                            **taxon_info_cache[taxid].get("xrefs", {}),
+                            **desc_dict["xrefs"],
+                        }
                     update_count += 1
         if update_count > 0:
             print(
