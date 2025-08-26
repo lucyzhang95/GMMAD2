@@ -42,7 +42,7 @@ class GMMAD2Parser(CacheHelper):
             "id": f"MESH:{line[1]}",
             "name": line[2].lower(),
             "type": "biolink:Disease",
-            "description": line[18],
+            "description": f"{line[18]}[MESH]",
             "xrefs": {"mesh": f"MESH:{line[1]}"},
         }
         return self.parser_helpers.remove_empty_none_values(node)
