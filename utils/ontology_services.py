@@ -166,8 +166,12 @@ class NCItTaxonomyService:
             pref_label = result.get("prefLabel", "").lower()
             if pref_label != name:
                 continue
+
             definition = result.get("definition", [])
-            ncit_id = result.get("@id", "").split("#")[-1]
+
+            uri = result.get("@id", "")
+            ncit_id = uri.rsplit("/", 1)[-1] or uri.split("#")[-1]
+
             return name, {
                 "description": f"{definition[0]} [NCIT]" if definition else "",
                 "xrefs": {"ncit": ncit_id},
