@@ -88,9 +88,12 @@ class RecordStatsReporter(CacheHelper):
         for node in nodes:
             mw = node.get("molecular_weight", {})
             if isinstance(mw, dict):
-                if "average" in mw and mw["average_molecular_weight"] is not None:
+                if "average_molecular_weight" in mw and mw["average_molecular_weight"] is not None:
                     mw_data["average"].append(mw["average_molecular_weight"])
-                if "monoisotopic" in mw and mw["monoisotopic_molecular_weight"] is not None:
+                if (
+                    "monoisotopic_molecular_weight" in mw
+                    and mw["monoisotopic_molecular_weight"] is not None
+                ):
                     mw_data["monoisotopic"].append(mw["monoisotopic_molecular_weight"])
 
         return {

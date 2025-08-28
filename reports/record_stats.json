@@ -1,7 +1,7 @@
 {
   "data_source": "GMMAD2",
   "metadata": {
-    "analysis_date": "2025-08-27T23:16:14.553131",
+    "analysis_date": "2025-08-27T23:36:51.046416",
     "report_version": "1.0",
     "total_records_analyzed": 1435540,
     "total_records_analyzed_by_relationship": {
@@ -28,63 +28,63 @@
     "duplicate_count": 7836,
     "duplicates": {
       "2": [
-        "69825_associated_with_D006111",
-        "717_associated_with_D037841",
-        "561180_has_metabolic_interaction_with_5950"
+        "411490_has_metabolic_interaction_with_5958",
+        "649764_has_metabolic_interaction_with_68841",
+        "1156431_has_metabolic_interaction_with_135398604"
       ],
       "3": [
-        "1888_associated_with_D002318",
-        "100884_associated_with_D003920",
-        "36839_associated_with_D007410"
+        "301953_associated_with_D003863",
+        "36839_associated_with_D008545",
+        "1639133_has_metabolic_interaction_with_199"
       ],
       "4": [
-        "306_has_metabolic_interaction_with_64959",
-        "306_has_metabolic_interaction_with_7427",
-        "312_interacts_with_P62805"
+        "306_has_metabolic_interaction_with_311",
+        "818_has_metabolic_interaction_with_68841",
+        "306_has_metabolic_interaction_with_6029"
       ],
       "5": [
-        "818_has_metabolic_interaction_with_978",
         "818_has_metabolic_interaction_with_439281",
-        "818_has_metabolic_interaction_with_122356"
+        "818_has_metabolic_interaction_with_35717",
+        "818_has_metabolic_interaction_with_643"
       ],
       "6": [
-        "818_has_metabolic_interaction_with_493570",
         "818_has_metabolic_interaction_with_6180",
-        "446660_has_metabolic_interaction_with_91469"
+        "818_has_metabolic_interaction_with_493570",
+        "818_has_metabolic_interaction_with_439174"
       ],
       "7": [
-        "818_has_metabolic_interaction_with_171548",
         "818_has_metabolic_interaction_with_196",
+        "818_has_metabolic_interaction_with_171548",
         "818_has_metabolic_interaction_with_903"
       ],
       "8": [
-        "818_has_metabolic_interaction_with_1052",
-        "818_has_metabolic_interaction_with_774"
+        "818_has_metabolic_interaction_with_774",
+        "818_has_metabolic_interaction_with_1052"
       ],
       "9": [
+        "818_has_metabolic_interaction_with_135398660",
         "818_has_metabolic_interaction_with_100714",
-        "818_has_metabolic_interaction_with_776",
-        "818_has_metabolic_interaction_with_867"
+        "818_has_metabolic_interaction_with_8369"
       ],
       "10": [
-        "818_has_metabolic_interaction_with_612",
-        "818_has_metabolic_interaction_with_1923",
-        "818_has_metabolic_interaction_with_7018721"
+        "818_has_metabolic_interaction_with_137",
+        "818_has_metabolic_interaction_with_87",
+        "818_has_metabolic_interaction_with_11266"
       ],
       "11": [
-        "818_has_metabolic_interaction_with_487",
-        "818_has_metabolic_interaction_with_825",
-        "818_has_metabolic_interaction_with_444972"
+        "818_has_metabolic_interaction_with_6288",
+        "818_has_metabolic_interaction_with_5326566",
+        "818_has_metabolic_interaction_with_5284607"
       ],
       "12": [
-        "818_has_metabolic_interaction_with_736715",
-        "818_has_metabolic_interaction_with_6262",
-        "818_has_metabolic_interaction_with_1103"
+        "818_has_metabolic_interaction_with_102526",
+        "818_has_metabolic_interaction_with_18189",
+        "818_has_metabolic_interaction_with_6287"
       ],
       "13": [
+        "818_has_metabolic_interaction_with_5962",
         "818_has_metabolic_interaction_with_439182",
-        "818_has_metabolic_interaction_with_6322",
-        "818_has_metabolic_interaction_with_9750"
+        "818_has_metabolic_interaction_with_305"
       ]
     },
     "duplicates_distribution": {
@@ -189,18 +189,18 @@
       },
       "mege_subject_molecular_weight_stats": {
         "average": {
-          "count": 0,
-          "max": null,
-          "mean": null,
-          "median": null,
-          "min": null
+          "count": 53822,
+          "max": 1329.3,
+          "mean": 222.763,
+          "median": 146.21,
+          "min": 2.016
         },
         "monoisotopic": {
-          "count": 0,
-          "max": null,
-          "mean": null,
-          "median": null,
-          "min": null
+          "count": 53822,
+          "max": 1328.564325,
+          "mean": 222.626,
+          "median": 146.118,
+          "min": 2.0156500638
         }
       },
       "mege_subject_xlogp_stats": {
@@ -343,18 +343,18 @@
       },
       "mime_object_molecular_weight_stats": {
         "average": {
-          "count": 0,
-          "max": null,
-          "mean": null,
-          "median": null,
-          "min": null
+          "count": 563571,
+          "max": 3979.0,
+          "mean": 374.201,
+          "median": 246.09,
+          "min": 1.008
         },
         "monoisotopic": {
-          "count": 0,
-          "max": null,
-          "mean": null,
-          "median": null,
-          "min": null
+          "count": 563571,
+          "max": 3976.7002545,
+          "mean": 373.994,
+          "median": 246.006,
+          "min": 1.0078250319
         }
       },
       "mime_object_xlogp_stats": {
