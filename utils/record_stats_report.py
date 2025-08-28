@@ -516,7 +516,169 @@ class RecordStatsReporter(CacheHelper):
 
         return stats
 
+    def export_all_duplicated_records(self) -> str:
+        """Export all duplicated records to a JSON file."""
+        print("\n▶️ Exporting all duplicated records...")
+
+        combined_data = self.load_pickle("gmmad2_parsed_records.pkl")
+        if not combined_data:
+            print(
+                "❌ No data found. Please ensure gmmad2_parsed_records.pkl exists in cache directory."
+            )
+            return ""
+
+        all_records_with_type = []
+        for rel_type, records in combined_data.items():
+            for record in records:
+                record_with_type = record.copy()
+                record_with_type["_relationship_type"] = rel_type
+                all_records_with_type.append(record_with_type)
+
+        id_to_records = defaultdict(list)
+        for record in all_records_with_type:
+            record_id = record.get("_id")
+            if record_id:
+                id_to_records[record_id].append(record)
+
+        # Filter only duplicates (count > 1)
+        duplicated_records = {}
+        total_duplicate_records = 0
+
+        for record_id, records in id_to_records.items():
+            if len(records) > 1:
+                duplicated_records[record_id] = {
+                    "duplicate_count": len(records),
+                    "records": records,
+                }
+                total_duplicate_records += len(records)
+
+        # Prepare export data
+        export_data = {
+            "metadata": {
+                "export_date": datetime.now().isoformat(),
+                "total_duplicate_ids": len(duplicated_records),
+                "total_duplicate_records": total_duplicate_records,
+                "description": "All records with duplicate _id values",
+            },
+            "duplicated_records": duplicated_records,
+        }
+
+        # Save to file
+        report_path = os.path.join(self.report_dir, "all_duplicated_records.json")
+        with open(report_path, "w") as f:
+            json.dump(export_data, f, indent=2, sort_keys=True)
+
+        print(f"💾 All duplicated records exported to: {report_path}")
+        print(
+            f"✅ Found {len(duplicated_records)} duplicate IDs with {total_duplicate_records} total records"
+        )
+
+        return report_path
+
+    def export_sampled_duplicated_records(self) -> str:
+        """Export randomly sampled duplicated records (3 examples per duplication count)."""
+        print("\n▶️ Exporting sampled duplicated records...")
+
+        combined_data = self.load_pickle("gmmad2_parsed_records.pkl")
+        if not combined_data:
+            print(
+                "❌ No data found. Please ensure gmmad2_parsed_records.pkl exists in cache directory."
+            )
+            return ""
+
+        all_records_with_type = []
+        for rel_type, records in combined_data.items():
+            for record in records:
+                record_with_type = record.copy()
+                record_with_type["_relationship_type"] = rel_type
+                all_records_with_type.append(record_with_type)
+
+        # duplicated records and group by count
+        id_to_records = defaultdict(list)
+        for record in all_records_with_type:
+            record_id = record.get("_id")
+            if record_id:
+                id_to_records[record_id].append(record)
+
+        # group duplicates by count
+        count_groups = defaultdict(list)
+        for record_id, records in id_to_records.items():
+            if len(records) > 1:  # Only duplicates
+                count_groups[len(records)].append({"id": record_id, "records": records})
+
+        # 3 examples from each count group
+        sampled_duplicates = {}
+        total_sampled_records = 0
+
+        for count, duplicate_list in count_groups.items():
+            sample_size = min(3, len(duplicate_list))
+            sampled_items = random.sample(duplicate_list, sample_size)
+
+            sampled_duplicates[f"count_{count}"] = {
+                "duplicate_count": count,
+                "total_ids_with_this_count": len(duplicate_list),
+                "sampled_examples": {},
+            }
+
+            for item in sampled_items:
+                sampled_duplicates[f"count_{count}"]["sampled_examples"][item["id"]] = {
+                    "duplicate_count": count,
+                    "records": item["records"],
+                }
+                total_sampled_records += len(item["records"])
+
+        export_data = {
+            "metadata": {
+                "export_date": datetime.now().isoformat(),
+                "sampling_strategy": "3 random examples per duplication count",
+                "total_duplicate_count_groups": len(count_groups),
+                "total_sampled_ids": sum(
+                    len(group["sampled_examples"]) for group in sampled_duplicates.values()
+                ),
+                "total_sampled_records": total_sampled_records,
+                "description": "Randomly sampled duplicate records (3 examples per duplication count)",
+            },
+            "count_distribution": {
+                f"count_{count}": len(duplicate_list)
+                for count, duplicate_list in count_groups.items()
+            },
+            "sampled_duplicates": sampled_duplicates,
+        }
+
+        report_path = os.path.join(self.report_dir, "sampled_duplicated_records.json")
+        with open(report_path, "w") as f:
+            json.dump(export_data, f, indent=2, sort_keys=True)
+
+        print(f"💾 Sampled duplicated records exported to: {report_path}")
+        print(
+            f"📊 Sampled {len(sampled_duplicates)} count groups with {total_sampled_records} total records"
+        )
+
+        for _, data in sampled_duplicates.items():
+            count = data["duplicate_count"]
+            total_with_count = data["total_ids_with_this_count"]
+            sampled_count = len(data["sampled_examples"])
+            print(f"-> {count}x duplicates: {sampled_count}/{total_with_count} IDs sampled")
+
+        return report_path
+
+    def export_both_duplicate_reports(self) -> Dict[str, str]:
+        """Export both complete and sampled duplicate reports."""
+        print("\n📋 Exporting duplicate record reports...")
+
+        paths = {
+            "all_duplicates": self.export_all_duplicated_records(),
+            "sampled_duplicates": self.export_sampled_duplicated_records(),
+        }
+
+        print("🎉 Duplicate export complete!")
+        return paths
+
 
 if __name__ == "__main__":
     reporter = RecordStatsReporter()
     stats_report = reporter.run_full_analysis()
+
+    paths = reporter.export_both_duplicate_reports()
+    print(f"All duplicates: {paths['all_duplicates']}")
+    print(f"Sampled duplicates: {paths['sampled_duplicates']}")

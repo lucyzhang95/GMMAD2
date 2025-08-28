@@ -1,7 +1,7 @@
 {
   "data_source": "GMMAD2",
   "metadata": {
-    "analysis_date": "2025-08-28T01:59:48.728775",
+    "analysis_date": "2025-08-28T14:59:21.439563",
     "report_version": "1.0",
     "total_records_analyzed": 1435152,
     "total_records_analyzed_by_relationship": {
@@ -28,63 +28,63 @@
     "duplicate_count": 7448,
     "duplicates": {
       "2": [
-        "311460_associated_with_D007230",
-        "518637_has_metabolic_interaction_with_938",
-        "1156431_has_metabolic_interaction_with_14m3ohdACP"
+        "215721_has_metabolic_interaction_with_5484352",
+        "1718_associated_with_D003922",
+        "411476_has_metabolic_interaction_with_6287"
       ],
       "3": [
-        "1873897_has_metabolic_interaction_with_657272",
-        "301953_associated_with_D010661",
-        "100884_associated_with_D035061"
+        "1873897_has_metabolic_interaction_with_6322",
+        "67351_associated_with_D013167",
+        "1888_associated_with_D009765"
       ],
       "4": [
-        "306_has_metabolic_interaction_with_190",
-        "306_has_metabolic_interaction_with_657272",
-        "818_has_metabolic_interaction_with_936"
+        "306_has_metabolic_interaction_with_1188",
+        "306_has_metabolic_interaction_with_7427",
+        "306_has_metabolic_interaction_with_126041"
       ],
       "5": [
-        "818_has_metabolic_interaction_with_68310",
         "818_has_metabolic_interaction_with_439281",
-        "28026_has_metabolic_interaction_with_139597845"
+        "818_has_metabolic_interaction_with_35717",
+        "853_has_metabolic_interaction_with_104775"
       ],
       "6": [
-        "818_has_metabolic_interaction_with_6180",
         "818_has_metabolic_interaction_with_138",
-        "818_has_metabolic_interaction_with_493570"
+        "818_has_metabolic_interaction_with_493570",
+        "818_has_metabolic_interaction_with_6274"
       ],
       "7": [
-        "818_has_metabolic_interaction_with_903",
+        "818_has_metabolic_interaction_with_171548",
         "818_has_metabolic_interaction_with_196",
-        "818_has_metabolic_interaction_with_171548"
+        "818_has_metabolic_interaction_with_903"
       ],
       "8": [
         "818_has_metabolic_interaction_with_1052",
         "818_has_metabolic_interaction_with_774"
       ],
       "9": [
-        "818_has_metabolic_interaction_with_776",
-        "818_has_metabolic_interaction_with_867",
-        "818_has_metabolic_interaction_with_8369"
+        "818_has_metabolic_interaction_with_100714",
+        "818_has_metabolic_interaction_with_875",
+        "818_has_metabolic_interaction_with_867"
       ],
       "10": [
-        "818_has_metabolic_interaction_with_65072",
-        "818_has_metabolic_interaction_with_2337",
-        "818_has_metabolic_interaction_with_127"
+        "818_has_metabolic_interaction_with_92779",
+        "818_has_metabolic_interaction_with_227",
+        "818_has_metabolic_interaction_with_1923"
       ],
       "11": [
-        "818_has_metabolic_interaction_with_5281125",
-        "818_has_metabolic_interaction_with_5284607",
-        "818_has_metabolic_interaction_with_487"
+        "818_has_metabolic_interaction_with_487",
+        "818_has_metabolic_interaction_with_525",
+        "818_has_metabolic_interaction_with_5280353"
       ],
       "12": [
-        "818_has_metabolic_interaction_with_102526",
-        "818_has_metabolic_interaction_with_18189",
-        "818_has_metabolic_interaction_with_834"
+        "818_has_metabolic_interaction_with_159659",
+        "818_has_metabolic_interaction_with_10685",
+        "818_has_metabolic_interaction_with_92904"
       ],
       "13": [
-        "818_has_metabolic_interaction_with_190",
-        "818_has_metabolic_interaction_with_145742",
-        "818_has_metabolic_interaction_with_9750"
+        "818_has_metabolic_interaction_with_199",
+        "818_has_metabolic_interaction_with_9750",
+        "818_has_metabolic_interaction_with_5962"
       ]
     },
     "duplicates_distribution": {
