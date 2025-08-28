@@ -66,6 +66,21 @@ class RecordStatsReporter(CacheHelper):
                     xref_counts[key] = 1
         return xref_counts
 
+    def _collect_unique_xrefs(self, node: Dict[str, Any]) -> Dict[str, set]:
+        """Collect unique xref values by type from a node."""
+        xrefs = node.get("xrefs", {})
+        if not xrefs:
+            return {}
+
+        unique_xrefs = {}
+        for key, value in xrefs.items():
+            if value:  # only non-empty xrefs
+                if isinstance(value, list):
+                    unique_xrefs[key] = set(value)
+                else:
+                    unique_xrefs[key] = {value}
+        return unique_xrefs
+
     def _analyze_molecular_weight(self, nodes: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Analyze molecular weight data from nodes."""
         mw_data = {"average": [], "monoisotopic": []}
@@ -73,10 +88,10 @@ class RecordStatsReporter(CacheHelper):
         for node in nodes:
             mw = node.get("molecular_weight", {})
             if isinstance(mw, dict):
-                if "average" in mw and mw["average"] is not None:
-                    mw_data["average"].append(mw["average"])
-                if "monoisotopic" in mw and mw["monoisotopic"] is not None:
-                    mw_data["monoisotopic"].append(mw["monoisotopic"])
+                if "average" in mw and mw["average_molecular_weight"] is not None:
+                    mw_data["average"].append(mw["average_molecular_weight"])
+                if "monoisotopic" in mw and mw["monoisotopic_molecular_weight"] is not None:
+                    mw_data["monoisotopic"].append(mw["monoisotopic_molecular_weight"])
 
         return {
             "average": self._safe_get_numeric_stats(mw_data["average"]),
@@ -114,11 +129,10 @@ class RecordStatsReporter(CacheHelper):
             total_records += count
 
         stats["metadata"]["total_records_analyzed"] = total_records
-        stats["metadata"] = {"total_records_analyzed_by_relationship": relationship_counts}
+        stats["metadata"]["total_records_analyzed_by_relationship"] = relationship_counts
 
         all_records = []
         all_evidence_types = []
-        all_ids = []
         all_subject_curies = []
         all_object_curies = []
         all_subject_xrefs = defaultdict(int)
@@ -133,7 +147,6 @@ class RecordStatsReporter(CacheHelper):
 
             all_records.extend(records)
             all_evidence_types.extend(rel_stats.get("evidence_types", {}).keys())
-            all_ids.extend(rel_stats.get("record_ids", []))
             all_subject_curies.extend(rel_stats.get("subject_curie_stats", {}).keys())
             all_object_curies.extend(rel_stats.get("object_curie_stats", {}).keys())
 
@@ -158,7 +171,7 @@ class RecordStatsReporter(CacheHelper):
 
         stats["overall_evidence_types"] = dict(evidence_counter)
 
-        # ID duplication check
+        # _id duplication check
         all_record_ids = []
         for records in combined_data.values():
             for record in records:
@@ -169,7 +182,8 @@ class RecordStatsReporter(CacheHelper):
 
         count_groups = defaultdict(list)
         for id_val, count in id_counter.items():
-            count_groups[count].append(id_val)
+            if count > 1:
+                count_groups[count].append(id_val)
 
         # randomly select 3 IDs from each count group
         sampled_ids_by_count = {}
@@ -182,7 +196,7 @@ class RecordStatsReporter(CacheHelper):
             "unique_ids": len(id_counter),
             "duplicate_count": len(duplicates),
             "duplicates": sampled_ids_by_count,
-            "duplicates_distribution": dict(Counter(id_counter.values())),
+            "duplicates_distribution": dict(Counter(k for k in id_counter.values() if k > 1)),
         }
 
         # CURIE analysis
@@ -198,7 +212,9 @@ class RecordStatsReporter(CacheHelper):
                     overall_object_curies.append(self._extract_curie_prefix(object_id))
 
         stats["overall_subject_curie_stats"] = dict(Counter(overall_subject_curies))
+        stats["overall_unique_subject_curie_count"] = len(set(overall_subject_curies))
         stats["overall_object_curie_stats"] = dict(Counter(overall_object_curies))
+        stats["overall_unique_object_curie_count"] = len(set(overall_object_curies))
 
         # description analysis
         subject_desc_count = 0
@@ -212,35 +228,60 @@ class RecordStatsReporter(CacheHelper):
 
         stats["overall_description_stats"] = {
             "subject_descriptions": subject_desc_count,
+            "subject_description_percentage": round((subject_desc_count / total_records) * 100, 2),
             "object_descriptions": object_desc_count,
+            "object_description_percentage": round((object_desc_count / total_records) * 100, 2),
         }
 
-        # xrefs analysis
         overall_subject_xrefs = defaultdict(int)
         overall_object_xrefs = defaultdict(int)
+        overall_subject_unique_xrefs = defaultdict(set)
+        overall_object_unique_xrefs = defaultdict(set)
+
         for records in combined_data.values():
             for record in records:
                 subject_xrefs = self._count_xrefs(record.get("subject", {}))
                 object_xrefs = self._count_xrefs(record.get("object", {}))
+                subject_unique_xrefs = self._collect_unique_xrefs(record.get("subject", {}))
+                object_unique_xrefs = self._collect_unique_xrefs(record.get("object", {}))
+
                 for xref_type, count in subject_xrefs.items():
                     overall_subject_xrefs[xref_type] += count
                 for xref_type, count in object_xrefs.items():
                     overall_object_xrefs[xref_type] += count
 
+                for xref_type, unique_values in subject_unique_xrefs.items():
+                    overall_subject_unique_xrefs[xref_type].update(unique_values)
+                for xref_type, unique_values in object_unique_xrefs.items():
+                    overall_object_unique_xrefs[xref_type].update(unique_values)
+
+        # Convert sets to counts for JSON serialization
+        subject_unique_counts = {k: len(v) for k, v in overall_subject_unique_xrefs.items()}
+        object_unique_counts = {k: len(v) for k, v in overall_object_unique_xrefs.items()}
+
         stats["overall_xref_stats"] = {
             "subject_xrefs": dict(overall_subject_xrefs),
             "object_xrefs": dict(overall_object_xrefs),
+            "subject_unique_xrefs": subject_unique_counts,
+            "object_unique_xrefs": object_unique_counts,
         }
 
         # publication analysis
+        overall_publication_count = 0
         overall_pmid_count = 0
         for records in combined_data.values():
             for record in records:
+                pub = record.get("association", {}).get("publications", {})
                 pmid = record.get("association", {}).get("publications", {}).get("pmid")
+                if pub:
+                    overall_publication_count += 1
                 if pmid:
                     overall_pmid_count += 1
 
-        stats["overall_publication_stats"] = {"records_with_pmid": overall_pmid_count}
+        stats["overall_publication_stats"] = {
+            "records_with_publication": overall_publication_count,
+            "records_with_pmid": overall_pmid_count,
+        }
 
         print(f"Generated comprehensive statistics for {total_records} total records.")
         return stats
@@ -251,7 +292,6 @@ class RecordStatsReporter(CacheHelper):
 
         rel_stats = {
             "record_count": len(records),
-            "record_ids": [],
             "evidence_types": {},
             "subject_curie_stats": {},
             "object_curie_stats": {},
@@ -259,6 +299,8 @@ class RecordStatsReporter(CacheHelper):
             "object_description_count": 0,
             "subject_xref_stats": defaultdict(int),
             "object_xref_stats": defaultdict(int),
+            "subject_unique_xref_stats": defaultdict(set),
+            "object_unique_xref_stats": defaultdict(set),
             "publication_stats": {"records_with_pmid": 0},
         }
 
@@ -268,9 +310,6 @@ class RecordStatsReporter(CacheHelper):
         object_curie_counter = Counter()
 
         for record in records:
-            # record _ids
-            rel_stats["record_ids"].append(record.get("_id"))
-
             # evidence types
             evidence_type = record.get("association", {}).get("evidence_type")
             if evidence_type:
@@ -294,13 +333,20 @@ class RecordStatsReporter(CacheHelper):
             if record.get("object", {}).get("description"):
                 rel_stats["object_description_count"] += 1
 
-            # xrefs
             subject_xrefs = self._count_xrefs(record.get("subject", {}))
             object_xrefs = self._count_xrefs(record.get("object", {}))
+            subject_unique_xrefs = self._collect_unique_xrefs(record.get("subject", {}))
+            object_unique_xrefs = self._collect_unique_xrefs(record.get("object", {}))
+
             for xref_type, count in subject_xrefs.items():
                 rel_stats["subject_xref_stats"][xref_type] += count
             for xref_type, count in object_xrefs.items():
                 rel_stats["object_xref_stats"][xref_type] += count
+
+            for xref_type, unique_values in subject_unique_xrefs.items():
+                rel_stats["subject_unique_xref_stats"][xref_type].update(unique_values)
+            for xref_type, unique_values in object_unique_xrefs.items():
+                rel_stats["object_unique_xref_stats"][xref_type].update(unique_values)
 
             # publications
             pmid = record.get("association", {}).get("publications", {}).get("pmid")
@@ -312,6 +358,13 @@ class RecordStatsReporter(CacheHelper):
         rel_stats["object_curie_stats"] = dict(object_curie_counter)
         rel_stats["subject_xref_stats"] = dict(rel_stats["subject_xref_stats"])
         rel_stats["object_xref_stats"] = dict(rel_stats["object_xref_stats"])
+
+        rel_stats["subject_unique_xref_stats"] = {
+            k: len(v) for k, v in rel_stats["subject_unique_xref_stats"].items()
+        }
+        rel_stats["object_unique_xref_stats"] = {
+            k: len(v) for k, v in rel_stats["object_unique_xref_stats"].items()
+        }
 
         # relationship-specific analysis
         if rel_type == "microbe-disease":
@@ -409,7 +462,7 @@ class RecordStatsReporter(CacheHelper):
         habitats = []
         subject_nodes = []
         xlogp_values = []
-        publication_data = {"records_with_publications": 0, "publication_details": []}
+        publication_data = {"records_with_publications": 0}
 
         for record in records:
             association = record.get("association", {})
@@ -430,13 +483,6 @@ class RecordStatsReporter(CacheHelper):
             publications = association.get("publications", {})
             if publications and publications.get("pmid"):
                 publication_data["records_with_publications"] += 1
-                pub_detail = {
-                    "pmid": publications.get("pmid"),
-                    "has_summary": bool(publications.get("summary")),
-                    "has_name": bool(publications.get("name")),
-                    "has_doi": bool(publications.get("doi")),
-                }
-                publication_data["publication_details"].append(pub_detail)
 
         return {
             "mege_association_habitats": dict(Counter(habitats)),
