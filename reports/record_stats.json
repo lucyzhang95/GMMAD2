@@ -1,0 +1,412 @@
+{
+  "data_source": "GMMAD2",
+  "metadata": {
+    "analysis_date": "2025-08-27T23:16:14.553131",
+    "report_version": "1.0",
+    "total_records_analyzed": 1435540,
+    "total_records_analyzed_by_relationship": {
+      "metabolite-gene": 53823,
+      "microbe-disease": 508141,
+      "microbe-metabolite": 873576
+    }
+  },
+  "overall_description_stats": {
+    "object_description_percentage": 76.94,
+    "object_descriptions": 1104507,
+    "subject_description_percentage": 7.45,
+    "subject_descriptions": 106910
+  },
+  "overall_evidence_types": {
+    "ECO:0000000": 17958,
+    "ECO:0000218": 848843,
+    "ECO:0000221": 508141,
+    "ECO:0000269": 2290,
+    "ECO:0001230": 6854,
+    "ECO:0007669": 52662
+  },
+  "overall_id_analysis": {
+    "duplicate_count": 7836,
+    "duplicates": {
+      "2": [
+        "69825_associated_with_D006111",
+        "717_associated_with_D037841",
+        "561180_has_metabolic_interaction_with_5950"
+      ],
+      "3": [
+        "1888_associated_with_D002318",
+        "100884_associated_with_D003920",
+        "36839_associated_with_D007410"
+      ],
+      "4": [
+        "306_has_metabolic_interaction_with_64959",
+        "306_has_metabolic_interaction_with_7427",
+        "312_interacts_with_P62805"
+      ],
+      "5": [
+        "818_has_metabolic_interaction_with_978",
+        "818_has_metabolic_interaction_with_439281",
+        "818_has_metabolic_interaction_with_122356"
+      ],
+      "6": [
+        "818_has_metabolic_interaction_with_493570",
+        "818_has_metabolic_interaction_with_6180",
+        "446660_has_metabolic_interaction_with_91469"
+      ],
+      "7": [
+        "818_has_metabolic_interaction_with_171548",
+        "818_has_metabolic_interaction_with_196",
+        "818_has_metabolic_interaction_with_903"
+      ],
+      "8": [
+        "818_has_metabolic_interaction_with_1052",
+        "818_has_metabolic_interaction_with_774"
+      ],
+      "9": [
+        "818_has_metabolic_interaction_with_100714",
+        "818_has_metabolic_interaction_with_776",
+        "818_has_metabolic_interaction_with_867"
+      ],
+      "10": [
+        "818_has_metabolic_interaction_with_612",
+        "818_has_metabolic_interaction_with_1923",
+        "818_has_metabolic_interaction_with_7018721"
+      ],
+      "11": [
+        "818_has_metabolic_interaction_with_487",
+        "818_has_metabolic_interaction_with_825",
+        "818_has_metabolic_interaction_with_444972"
+      ],
+      "12": [
+        "818_has_metabolic_interaction_with_736715",
+        "818_has_metabolic_interaction_with_6262",
+        "818_has_metabolic_interaction_with_1103"
+      ],
+      "13": [
+        "818_has_metabolic_interaction_with_439182",
+        "818_has_metabolic_interaction_with_6322",
+        "818_has_metabolic_interaction_with_9750"
+      ]
+    },
+    "duplicates_distribution": {
+      "2": 6967,
+      "3": 690,
+      "4": 84,
+      "5": 9,
+      "6": 6,
+      "7": 3,
+      "8": 2,
+      "9": 8,
+      "10": 24,
+      "11": 13,
+      "12": 19,
+      "13": 11
+    },
+    "total_ids": 1435540,
+    "unique_ids": 1426092
+  },
+  "overall_object_curie_stats": {
+    "BIGG.METABOLITE": 112885,
+    "ENSEMBL": 11,
+    "KEGG.COMPOUND": 42221,
+    "KEGG.GLYCAN": 377,
+    "MESH": 508141,
+    "PUBCHEM.COMPOUND": 563571,
+    "UniProtKB": 53812,
+    "uuid": 154522
+  },
+  "overall_publication_stats": {
+    "records_with_pmid": 79,
+    "records_with_publication": 53823
+  },
+  "overall_subject_curie_stats": {
+    "NCBITaxon": 1381089,
+    "PUBCHEM.COMPOUND": 53822,
+    "uuid": 629
+  },
+  "overall_unique_object_curie_count": 8,
+  "overall_unique_subject_curie_count": 3,
+  "overall_xref_stats": {
+    "object_unique_xrefs": {
+      "bigg": 712,
+      "ensembl": 8245,
+      "entrezgene": 8194,
+      "hgnc": 8194,
+      "hmdb": 1117,
+      "kegg": 1395,
+      "mesh": 83,
+      "pubchem_cid": 1571,
+      "smiles": 1427,
+      "uniprotkb": 8224
+    },
+    "object_xrefs": {
+      "bigg": 328926,
+      "ensembl": 53821,
+      "entrezgene": 53504,
+      "hgnc": 53504,
+      "hmdb": 449732,
+      "kegg": 545507,
+      "mesh": 508141,
+      "pubchem_cid": 563571,
+      "smiles": 563571,
+      "uniprotkb": 53812
+    },
+    "subject_unique_xrefs": {
+      "bigg": 262,
+      "drugbank": 290,
+      "hmdb": 811,
+      "kegg": 851,
+      "ncit": 556,
+      "pubchem_cid": 924,
+      "smiles": 840
+    },
+    "subject_xrefs": {
+      "bigg": 16767,
+      "drugbank": 2290,
+      "hmdb": 51090,
+      "kegg": 53171,
+      "ncit": 53773,
+      "pubchem_cid": 53822,
+      "smiles": 53822
+    }
+  },
+  "relationship_analysis": {
+    "metabolite-gene": {
+      "evidence_types": {
+        "ECO:0000000": 74,
+        "ECO:0000218": 5,
+        "ECO:0000269": 2290,
+        "ECO:0007669": 52662
+      },
+      "mege_association_habitats": {
+        "drug related": 46201,
+        "environment": 18380,
+        "food related": 51180,
+        "host": 42265,
+        "microbiota": 53402
+      },
+      "mege_publication_stats": {
+        "records_with_publications": 79
+      },
+      "mege_subject_molecular_weight_stats": {
+        "average": {
+          "count": 0,
+          "max": null,
+          "mean": null,
+          "median": null,
+          "min": null
+        },
+        "monoisotopic": {
+          "count": 0,
+          "max": null,
+          "mean": null,
+          "median": null,
+          "min": null
+        }
+      },
+      "mege_subject_xlogp_stats": {
+        "count": 53630,
+        "max": 17.4,
+        "mean": -1.391,
+        "median": -1.5,
+        "min": -13.3
+      },
+      "object_curie_stats": {
+        "ENSEMBL": 11,
+        "UniProtKB": 53812
+      },
+      "object_description_count": 53823,
+      "object_unique_xref_stats": {
+        "ensembl": 8245,
+        "entrezgene": 8194,
+        "hgnc": 8194,
+        "uniprotkb": 8224
+      },
+      "object_xref_stats": {
+        "ensembl": 53821,
+        "entrezgene": 53504,
+        "hgnc": 53504,
+        "uniprotkb": 53812
+      },
+      "publication_stats": {
+        "records_with_pmid": 79
+      },
+      "record_count": 53823,
+      "subject_curie_stats": {
+        "PUBCHEM.COMPOUND": 53822,
+        "uuid": 1
+      },
+      "subject_description_count": 53802,
+      "subject_unique_xref_stats": {
+        "bigg": 262,
+        "drugbank": 290,
+        "hmdb": 811,
+        "kegg": 851,
+        "pubchem_cid": 924,
+        "smiles": 840
+      },
+      "subject_xref_stats": {
+        "bigg": 16767,
+        "drugbank": 2290,
+        "hmdb": 51090,
+        "kegg": 53171,
+        "pubchem_cid": 53822,
+        "smiles": 53822
+      }
+    },
+    "microbe-disease": {
+      "evidence_types": {
+        "ECO:0000221": 508141
+      },
+      "midi_disease_abundance_stats": {
+        "count": 122960,
+        "max": 53.8699,
+        "mean": 0.134,
+        "median": 0.004,
+        "min": 1.06e-05
+      },
+      "midi_disease_sample_size_stats": {
+        "count": 122960,
+        "max": 1579.0,
+        "mean": 22.671,
+        "median": 4.0,
+        "min": 1.0
+      },
+      "midi_healthy_abundance_stats": {
+        "count": 506466,
+        "max": 15.723,
+        "mean": 0.078,
+        "median": 0.004,
+        "min": 4.97e-05
+      },
+      "midi_healthy_sample_size_stats": {
+        "count": 506466,
+        "max": 12002.0,
+        "mean": 309.674,
+        "median": 23.0,
+        "min": 1.0
+      },
+      "midi_organism_types": {
+        "Archaeon": 11341,
+        "Other": 499,
+        "biolink:Bacterium": 496301
+      },
+      "midi_qualifiers": {
+        "decrease": 438671,
+        "increase": 69470
+      },
+      "midi_ranks": {
+        "biotype": 83,
+        "no rank": 4,
+        "species": 505042,
+        "species group": 83,
+        "strain": 1588,
+        "subspecies": 842
+      },
+      "object_curie_stats": {
+        "MESH": 508141
+      },
+      "object_description_count": 508141,
+      "object_unique_xref_stats": {
+        "mesh": 83
+      },
+      "object_xref_stats": {
+        "mesh": 508141
+      },
+      "publication_stats": {
+        "records_with_pmid": 0
+      },
+      "record_count": 508141,
+      "subject_curie_stats": {
+        "NCBITaxon": 507642,
+        "uuid": 499
+      },
+      "subject_description_count": 42610,
+      "subject_unique_xref_stats": {
+        "ncit": 527
+      },
+      "subject_xref_stats": {
+        "ncit": 43274
+      }
+    },
+    "microbe-metabolite": {
+      "evidence_types": {
+        "ECO:0000000": 17884,
+        "ECO:0000218": 848838,
+        "ECO:0001230": 6854
+      },
+      "mime_association_habitats": {
+        "drug related": 273499,
+        "environment": 50935,
+        "food related": 438930,
+        "host": 334984,
+        "microbiota": 549548
+      },
+      "mime_object_molecular_weight_stats": {
+        "average": {
+          "count": 0,
+          "max": null,
+          "mean": null,
+          "median": null,
+          "min": null
+        },
+        "monoisotopic": {
+          "count": 0,
+          "max": null,
+          "mean": null,
+          "median": null,
+          "min": null
+        }
+      },
+      "mime_object_xlogp_stats": {
+        "count": 537933,
+        "max": 26.0,
+        "mean": -0.998,
+        "median": -1.9,
+        "min": -15.5
+      },
+      "object_curie_stats": {
+        "BIGG.METABOLITE": 112885,
+        "KEGG.COMPOUND": 42221,
+        "KEGG.GLYCAN": 377,
+        "PUBCHEM.COMPOUND": 563571,
+        "uuid": 154522
+      },
+      "object_description_count": 542543,
+      "object_unique_xref_stats": {
+        "bigg": 712,
+        "hmdb": 1117,
+        "kegg": 1395,
+        "pubchem_cid": 1571,
+        "smiles": 1427
+      },
+      "object_xref_stats": {
+        "bigg": 328926,
+        "hmdb": 449732,
+        "kegg": 545507,
+        "pubchem_cid": 563571,
+        "smiles": 563571
+      },
+      "publication_stats": {
+        "records_with_pmid": 0
+      },
+      "record_count": 873576,
+      "subject_curie_stats": {
+        "NCBITaxon": 873447,
+        "uuid": 129
+      },
+      "subject_description_count": 10498,
+      "subject_unique_xref_stats": {
+        "ncit": 70
+      },
+      "subject_xref_stats": {
+        "ncit": 10499
+      }
+    }
+  },
+  "relationship_types": [
+    "microbe-disease",
+    "microbe-metabolite",
+    "metabolite-gene"
+  ],
+  "total_relationships": 3
+}
