@@ -540,7 +540,7 @@ class RecordStatsReporter(CacheHelper):
             if record_id:
                 id_to_records[record_id].append(record)
 
-        # Filter only duplicates (count > 1)
+        # filter only duplicates (count > 1)
         duplicated_records = {}
         total_duplicate_records = 0
 
@@ -552,7 +552,6 @@ class RecordStatsReporter(CacheHelper):
                 }
                 total_duplicate_records += len(records)
 
-        # Prepare export data
         export_data = {
             "metadata": {
                 "export_date": datetime.now().isoformat(),
@@ -563,8 +562,7 @@ class RecordStatsReporter(CacheHelper):
             "duplicated_records": duplicated_records,
         }
 
-        # Save to file
-        report_path = os.path.join(self.report_dir, "all_duplicated_records.json")
+        report_path = os.path.join(self.report_dir, f"all_duplicated_records_{datetime.now().isoformat()}.json")
         with open(report_path, "w") as f:
             json.dump(export_data, f, indent=2, sort_keys=True)
 
@@ -603,7 +601,7 @@ class RecordStatsReporter(CacheHelper):
         # group duplicates by count
         count_groups = defaultdict(list)
         for record_id, records in id_to_records.items():
-            if len(records) > 1:  # Only duplicates
+            if len(records) > 1:  # only duplicates
                 count_groups[len(records)].append({"id": record_id, "records": records})
 
         # 3 examples from each count group
@@ -645,7 +643,7 @@ class RecordStatsReporter(CacheHelper):
             "sampled_duplicates": sampled_duplicates,
         }
 
-        report_path = os.path.join(self.report_dir, "sampled_duplicated_records.json")
+        report_path = os.path.join(self.report_dir, f"sampled_duplicated_records_{datetime.now().isoformat()}.json")
         with open(report_path, "w") as f:
             json.dump(export_data, f, indent=2, sort_keys=True)
 
