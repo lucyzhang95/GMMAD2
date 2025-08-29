@@ -496,7 +496,9 @@ class RecordStatsReporter(CacheHelper):
 
     def save_stats_report(self, stats) -> str:
         """Save the statistics report to JSON file."""
-        report_path = os.path.join(self.report_dir, f"record_stats_{datetime.now().isoformat()}.json")
+        report_path = os.path.join(
+            self.report_dir, f"record_stats_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        )
         with open(report_path, "w") as f:
             json.dump(stats, f, indent=2, sort_keys=True)
 
@@ -562,7 +564,10 @@ class RecordStatsReporter(CacheHelper):
             "duplicated_records": duplicated_records,
         }
 
-        report_path = os.path.join(self.report_dir, f"all_duplicated_records_{datetime.now().isoformat()}.json")
+        report_path = os.path.join(
+            self.report_dir,
+            f"all_duplicated_records_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+        )
         with open(report_path, "w") as f:
             json.dump(export_data, f, indent=2, sort_keys=True)
 
@@ -643,7 +648,10 @@ class RecordStatsReporter(CacheHelper):
             "sampled_duplicates": sampled_duplicates,
         }
 
-        report_path = os.path.join(self.report_dir, f"sampled_duplicated_records_{datetime.now().isoformat()}.json")
+        report_path = os.path.join(
+            self.report_dir,
+            f"sampled_duplicated_records_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+        )
         with open(report_path, "w") as f:
             json.dump(export_data, f, indent=2, sort_keys=True)
 
