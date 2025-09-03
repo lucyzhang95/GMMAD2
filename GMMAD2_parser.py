@@ -41,6 +41,7 @@ class GMMAD2Parser(CacheHelper):
         node = {
             "id": f"MESH:{line[1]}",
             "name": line[2].lower(),
+            "original_name": line[2].lower(),
             "type": "biolink:Disease",
             "description": f"{line[18]}[MESH]",
             "xrefs": {"mesh": f"MESH:{line[1]}"},
