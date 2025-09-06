@@ -35,6 +35,7 @@ class RecordCacheManager(CacheHelper):
 
         return clean_record
 
+    # TODO: do not use use_memory_efficient=True...it takes lots of disk space and is slow
     def create_deduplicated_jsonl_streamed(self, data_loader, use_memory_efficient=False):
         """
         Process all relationship data, deduplicate, and stream directly to a JSONL file.
