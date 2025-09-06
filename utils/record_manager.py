@@ -1,6 +1,8 @@
+from typing import Any, Dict
+
 from tqdm.auto import tqdm
 
-from utils.cache_manager import CacheHelper
+from utils.cache_manager import CacheHelper, RecordHelper
 
 from .record_deduplicator import StreamDeduplicator
 
@@ -12,68 +14,67 @@ class RecordCacheManager(CacheHelper):
 
     def __init__(self, cache_dir=None):
         super().__init__(cache_dir)
+        self.record_helper = RecordHelper()
         print("RecordCacheManager initialized.")
+        print("=" * 50)
 
-    def cache_combined_associations(self, data_loader):
+    def _standardize_record(self, record: Dict[str, Any]) -> Dict[str, Any]:
+        """Standardizes a record by cleaning up empty values and formatting xrefs into a list."""
+        clean_record = record.copy()
+
+        for entity_key in ["subject", "object"]:
+            if entity_key in clean_record and isinstance(clean_record[entity_key], dict):
+                entity = clean_record[entity_key].copy()
+                if "xrefs" in entity and isinstance(entity["xrefs"], dict):
+                    entity["xrefs"] = [v for k, v in entity["xrefs"].items() if v]
+                clean_record[entity_key] = entity
+
+        return clean_record
+
+    def create_deduplicated_jsonl(self, data_loader):
         """
-        Uses the DataLoader to parse each relationship and combines them into one file.
-        The final format is a dictionary grouped by relationship type.
+        Process all relationship data, deduplicate by _id, and export to single JSONL file.
+        Each record is one line in the JSONL output file.
         """
-        print("\nCreating full GMMAD2 association record cache...")
+        print("\nCreating deduplicated GMMAD2 records as JSONL...")
+        print("=" * 50)
 
-        combined_data = {}
-        raw_counts = {}
+        deduplicator = StreamDeduplicator()
+        total_processed = 0
 
-        print("\n▶️ Processing microbe-disease associations...")
-        deduplicator_md = StreamDeduplicator()
-        record_iterator_md = data_loader.load_microbe_disease_data()
-
-        with tqdm(desc="Deduplicating microbe-disease") as pbar:
-            count = 0
-            for record in record_iterator_md:
-                deduplicator_md.process_record(record)
+        print("\n>>> Processing microbe-disease associations...")
+        with tqdm(desc="---Processing microbe-disease") as pbar:
+            for record in data_loader.load_microbe_disease_data():
+                deduplicator.process_record(record)
                 pbar.update(1)
-                count += 1
-            raw_counts["microbe-disease"] = count
-        combined_data["microbe-disease"] = list(deduplicator_md.get_results())
+                total_processed += 1
 
-        print("\n▶️ Processing microbe-metabolite associations...")
-        deduplicator_mm = StreamDeduplicator()
-        record_iterator_mm = data_loader.load_microbe_metabolite_data()
-        with tqdm(desc="Deduplicating microbe-metabolite") as pbar:
-            count = 0
-            for record in record_iterator_mm:
-                deduplicator_mm.process_record(record)
+        print("\n>>> Processing microbe-metabolite associations...")
+        with tqdm(desc="---Processing microbe-metabolite") as pbar:
+            for record in data_loader.load_microbe_metabolite_data():
+                deduplicator.process_record(record)
                 pbar.update(1)
-                count += 1
-            raw_counts["microbe-metabolite"] = count
-        combined_data["microbe-metabolite"] = list(deduplicator_mm.get_results())
+                total_processed += 1
 
-        print("\n▶️ Processing metabolite-gene associations...")
-        deduplicator_mg = StreamDeduplicator()
-        record_iterator_mg = data_loader.load_metabolite_gene_data()
-        with tqdm(desc="Deduplicating metabolite-gene") as pbar:
-            count = 0
-            for record in record_iterator_mg:
-                deduplicator_mg.process_record(record)
+        print("\n>>> Processing metabolite-gene associations...")
+        with tqdm(desc="---Processing metabolite-gene") as pbar:
+            for record in data_loader.load_metabolite_gene_data():
+                deduplicator.process_record(record)
                 pbar.update(1)
-                count += 1
-            raw_counts["metabolite-gene"] = count
-        combined_data["metabolite-gene"] = list(deduplicator_mg.get_results())
+                total_processed += 1
 
-        print("\n🎉 Deduplication complete. Finalizing cache...")
-        for key, dedup_list in combined_data.items():
-            raw_count = raw_counts.get(key, 0)
-            removed = raw_count - len(dedup_list)
-            print(
-                f"-> {key}: Processed {raw_count:,} records, removed {removed:,} duplicates ({len(dedup_list):,} unique records)."
-            )
+        deduplicated_records = list(deduplicator.get_results())
+        standardized_records = [self._standardize_record(record) for record in deduplicated_records]
 
-        self.save_pickle(combined_data, f"{self.COMBINED_FILENAME}.pkl")
-        self.save_json(combined_data, f"{self.COMBINED_FILENAME}.json")
-        total_records = sum(len(v) for v in combined_data.values())
-        print(
-            f"\n🎉 Full GMMAD2 association record cache with {total_records:,} records saved at {self.cache_dir}."
-        )
+        duplicates_removed = total_processed - len(standardized_records)
+
+        print(f"\n[DONE] Processed {total_processed:,} total records")
+        print(f"-> Removed {duplicates_removed:,} duplicates")
+        print(f"-> Final unique records: {len(standardized_records):,}")
+
+        jsonl_path = self.record_helper.save_jsonl(standardized_records, self.COMBINED_FILENAME)
+
+        print("\n[DONE] JSONL export complete.")
         print("Finished.\n")
-        return combined_data
+
+        return jsonl_path
