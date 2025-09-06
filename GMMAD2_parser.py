@@ -240,7 +240,7 @@ class GMMAD2Parser(CacheHelper):
         return self.parser_helpers.remove_empty_none_values(node)
 
     def parse_microbe_disease(self) -> Iterator[dict]:
-        print("\n--- Parsing Microbe-Disease Data ---")
+        print("\n>>> Parsing Microbe-Disease Data...")
         required_cache = "gmmad2_taxon_info.pkl"
         if not os.path.exists(self._get_path(required_cache)):
             self.cache_pipeline.run_cache_pipeline()
@@ -260,10 +260,10 @@ class GMMAD2Parser(CacheHelper):
                 "subject": subject_node,
             }
             rec_ct += 1
-        print(f"\n--- Finished Parsing Microbe-Disease. Generated {rec_ct} records. ---\n")
+        print(f"\n[DONE] Finished Parsing Microbe-Disease. Generated {rec_ct} records.\n")
 
     def parse_microbe_metabolite(self) -> Iterator[dict]:
-        print("\n--- Parsing Microbe-Metabolite Data ---")
+        print("\n>>> Parsing Microbe-Metabolite Data...")
         taxon_cache = self.load_pickle("gmmad2_taxon_info.pkl")
         pubchem_desc = self.load_pickle("gmmad2_pubchem_descriptions.pkl")
         pubchem_mw = self.load_pickle("gmmad2_pubchem_mw.pkl")
@@ -309,10 +309,10 @@ class GMMAD2Parser(CacheHelper):
                 "subject": subject_node,
             }
             rec_ct += 1
-        print(f"\n--- Finished Parsing Microbe-Metabolite. Generated {rec_ct} records. ---\n")
+        print(f"\n[DONE]  Finished Parsing Microbe-Metabolite. Generated {rec_ct} records.\n")
 
     def parse_metabolite_gene(self) -> Iterator[dict]:
-        print("\n--- Parsing Metabolite-Gene Data ---")
+        print("\n>>> Parsing Metabolite-Gene Data...")
         pubchem_descr = self.load_pickle("gmmad2_pubchem_descriptions.pkl")
         pubchem_mw = self.load_pickle("gmmad2_pubchem_mw.pkl")
         gene_info = self.load_pickle("gmmad2_protein_gene_combined_info.pkl")
@@ -354,7 +354,7 @@ class GMMAD2Parser(CacheHelper):
                 "subject": subject_node,
             }
             rec_ct += 1
-        print(f"\n--- Finished Parsing Metabolite-Gene. Generated {rec_ct} records. ---\n")
+        print(f"\n[DONE]  Finished Parsing Metabolite-Gene. Generated {rec_ct} records.\n")
 
 
 class DataLoader:
