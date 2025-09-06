@@ -53,17 +53,14 @@ class RecordStatsReporter(CacheHelper):
 
     def _count_xrefs(self, node: Dict[str, Any]) -> Dict[str, int]:
         """Count xref types in a node."""
-        xrefs = node.get("xrefs", {})
+        xrefs = node.get("xrefs", [])
         if not xrefs:
             return {}
 
         xref_counts = {}
-        for key, value in xrefs.items():
-            if value:  # only count non-empty xrefs
-                if isinstance(value, list):
-                    xref_counts[key] = len(value)
-                else:
-                    xref_counts[key] = 1
+        for curie in xrefs:
+            prefix = self._extract_curie_prefix(curie)
+            xref_counts[prefix] = len(curie)
         return xref_counts
 
     def _collect_unique_xrefs(self, node: Dict[str, Any]) -> Dict[str, set]:
