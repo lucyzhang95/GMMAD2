@@ -42,7 +42,7 @@ class GMMAD2Parser(CacheHelper):
             "id": f"MESH:{line[1]}",
             "name": line[2].lower(),
             "original_name": line[2].lower(),
-            "type": "biolink:Disease",
+            "category": "biolink:Disease",
             "description": f"{line[18]}[MESH]",
             "xrefs": {"mesh": f"MESH:{line[1]}"},
         }
@@ -60,7 +60,7 @@ class GMMAD2Parser(CacheHelper):
                 "parent_taxid": info.get("parent_taxid"),
                 "lineage": info.get("lineage", []),
                 "rank": info.get("rank"),
-                "type": "biolink:OrganismTaxon",
+                "category": "biolink:OrganismTaxon",
                 "xrefs": info.get("xrefs", {}),
             }
             node["organism_type"] = self.parser_helpers.get_organism_type(node)
@@ -68,7 +68,7 @@ class GMMAD2Parser(CacheHelper):
             node = {
                 "id": f"uuid:{str(uuid.uuid4())}",
                 "original_name": original_name.lower(),
-                "type": "biolink:OrganismTaxon",
+                "category": "biolink:OrganismTaxon",
                 "organism_type": "Other",
             }
         return self.parser_helpers.remove_empty_none_values(node)
@@ -94,7 +94,7 @@ class GMMAD2Parser(CacheHelper):
             "chemical_formula": formula if formula and formula != "not available" else None,
             "molecular_weight": pubchem_mw.get(cid, {}).get("molecular_weight", {}),
             "xlogp": pubchem_mw.get(cid, {}).get("xlogp", None),
-            "type": "biolink:SmallMolecule",
+            "category": "biolink:SmallMolecule",
             "xrefs": xrefs,
         }
         return self.parser_helpers.remove_empty_none_values(node)
@@ -119,7 +119,7 @@ class GMMAD2Parser(CacheHelper):
                 else None
             ),
             "residue_num": int(line[17]) if line[17] else None,
-            "type": "biolink:Protein",
+            "category": "biolink:Protein",
         }
         _, gene_xrefs = self.parser_helpers.assign_primary_gene_id(line)
         node["xrefs"] = gene_xrefs
