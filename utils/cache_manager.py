@@ -1,6 +1,8 @@
 import json
 import os
 import pickle
+from datetime import datetime
+from typing import Any, Dict, List
 
 from .ontology_mapper import BiGGMapper
 from .ontology_services import (
@@ -52,27 +54,69 @@ class CacheHelper:
             print(f"‼️Error loading pickle file {path}: {e}")
             return None
 
-    def save_json(self, obj, f_name: str, indent=4) -> str:
-        """Saves an object to a JSON file in the cache directory."""
-        path = self._get_path(f_name)
-        try:
-            with open(path, "w", encoding="utf-8") as out_f:
-                json.dump(obj, out_f, indent=indent)
-            print(f"✅Saved JSON to: {path}")
-        except (IOError, TypeError) as e:
-            print(f"‼️Error saving JSON file {path}: {e}")
 
-    def load_json(self, f_name: str):
-        """Loads an object from a JSON file. Returns None if it fails."""
-        path = self._get_path(f_name)
-        if not os.path.exists(path):
-            return None
-        try:
-            with open(path, "r", encoding="utf-8") as in_f:
+class RecordHelper:
+    """Handles saving and loading of records to/from JSON and JSONL files."""
+
+    RECORD_DIR = os.path.join("records")
+
+    def __init__(self, rec_dir=RECORD_DIR):
+        self.rec_dir = os.path.join(os.getcwd(), rec_dir)
+        os.makedirs(self.rec_dir, exist_ok=True)
+
+    def save_json(self, obj, f_name):
+        """Saves an object to a JSON file."""
+        with open(os.path.join(self.rec_dir, f_name), "w") as out_f:
+            json.dump(obj, out_f, indent=4)
+
+    def load_json(self, f_name):
+        """Loads an object from a JSON file."""
+        path = os.path.join(self.rec_dir, f_name)
+        if os.path.exists(path):
+            with open(path, "r") as in_f:
                 return json.load(in_f)
-        except (IOError, json.JSONDecodeError) as e:
-            print(f"‼️Error loading JSON file {path}: {e}")
+        return None
+
+    def save_jsonl(self, records: List[Dict[str, Any]], f_name: str):
+        """Saves records to a JSONL file with standardized formatting."""
+        if not records:
+            print("!!! Warning: No records provided for JSONL export.")
             return None
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        base_name = f_name.replace(".jsonl", "") if f_name.endswith(".jsonl") else f_name
+        jsonl_filename = f"{base_name}_{timestamp}.jsonl"
+        jsonl_path = os.path.join(self.rec_dir, jsonl_filename)
+
+        exported_count = 0
+        with open(jsonl_path, "w", encoding="utf-8") as f:
+            for record in records:
+                json.dump(record, f, ensure_ascii=False, separators=(",", ":"))
+                f.write("\n")
+                exported_count += 1
+
+        print(f"-> Exported {exported_count} records to {jsonl_path}")
+        return jsonl_path
+
+    def load_jsonl(self, f_name: str) -> List[Dict[str, Any]]:
+        """Load records from JSONL file."""
+        path = os.path.join(self.rec_dir, f_name)
+
+        if not os.path.exists(path):
+            return []
+
+        records = []
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        records.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+
+        print(f"-> Loaded {len(records)} records from {f_name}")
+        return records
 
 
 class CacheManager(CacheHelper):
