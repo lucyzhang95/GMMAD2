@@ -399,4 +399,6 @@ if __name__ == "__main__":
     all_gmmad2_recs = data_loader.load_entire_gmmad2_data()
 
     record_cache_manager = RecordCacheManager()
-    record_cache_manager.create_deduplicated_jsonl(data_loader=DataLoader())
+    record_cache_manager.create_deduplicated_jsonl_streamed(
+        data_loader=data_loader, use_memory_efficient=True
+    )

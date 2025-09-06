@@ -1,4 +1,6 @@
 import json
+import os
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
 
@@ -12,7 +14,7 @@ from .record_deduplicator import MemoryEfficientDeduplicator, StreamDeduplicator
 class RecordCacheManager(CacheHelper):
     """Manages the creation of a combined cache from individual relationship files."""
 
-    COMBINED_FILENAME = "gmmad2_parsed_records"
+    COMBINED_FILENAME = f"gmmad2_parsed_records_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
     def __init__(self, cache_dir=None):
         super().__init__(cache_dir)
@@ -33,13 +35,12 @@ class RecordCacheManager(CacheHelper):
 
         return clean_record
 
-    def create_deduplicated_jsonl_streamed(self, data_loader, use_memory_efficient=True):
+    def create_deduplicated_jsonl_streamed(self, data_loader, use_memory_efficient=False):
         """
-        Process all relationship data, deduplicate, and stream directly to JSONL file.
+        Process all relationship data, deduplicate, and stream directly to a JSONL file.
 
-        Args:
-            data_loader: The data loader instance
-            use_memory_efficient: If True, uses disk-based deduplication for very large datasets
+        :param data_loader: The data loader instance
+        :param use_memory_efficient: If True, uses disk-based deduplication for very large datasets
         """
         print(
             f"\nCreating deduplicated GMMAD2 records as JSONL (streaming, memory_efficient={use_memory_efficient})..."
@@ -47,13 +48,15 @@ class RecordCacheManager(CacheHelper):
         print("=" * 50)
 
         if use_memory_efficient:
-            deduplicator = MemoryEfficientDeduplicator(temp_dir=str(self.cache_dir / "temp_dedup"))
+            deduplicator = MemoryEfficientDeduplicator(
+                temp_dir=os.path.join(self.record_helper.rec_dir, "temp_dedup")
+            )
             print("Using memory-efficient deduplicator (disk-based)")
         else:
             deduplicator = StreamDeduplicator()
             print("Using in-memory deduplicator")
 
-        output_path = Path(self.record_helper.cache_dir) / f"{self.COMBINED_FILENAME}.jsonl"
+        output_path = Path(self.record_helper.rec_dir) / f"{self.COMBINED_FILENAME}.jsonl"
 
         total_processed = 0
         records_written = 0
@@ -120,17 +123,12 @@ class RecordCacheManager(CacheHelper):
 
         return str(output_path)
 
-    def create_deduplicated_jsonl_simple_streaming(self, data_loader):
-        """
-        Simplified streaming approach - processes records one by one without deduplication.
-        Use this if you're confident there are no duplicates or want maximum speed.
-        """
+    def create_deduplicated_jsonl_streamed_no_dedup(self, data_loader):
+        """Simplified streaming approach - processes records one by one without deduplication."""
         print("\nCreating GMMAD2 records as JSONL (simple streaming, no deduplication)...")
         print("=" * 50)
 
-        output_path = (
-            Path(self.record_helper.cache_dir) / f"{self.COMBINED_FILENAME}_no_dedup.jsonl"
-        )
+        output_path = Path(self.record_helper.rec_dir) / f"{self.COMBINED_FILENAME}_no_dedup.jsonl"
         total_processed = 0
 
         with open(output_path, "w", encoding="utf-8") as f:
@@ -158,8 +156,5 @@ class RecordCacheManager(CacheHelper):
         return str(output_path)
 
     def create_deduplicated_jsonl(self, data_loader):
-        """
-        Original method - loads all records into memory.
-        Use create_deduplicated_jsonl_streaming() for better memory efficiency.
-        """
+        """Loads all records into memory. Deduplicates and merges them, then writes to JSONL file."""
         return self.create_deduplicated_jsonl_streamed(data_loader, use_memory_efficient=False)
