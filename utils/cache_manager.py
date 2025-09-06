@@ -26,7 +26,7 @@ class CacheHelper:
         """Initializes the CacheManager and ensures the cache directory exists."""
         self.cache_dir = cache_dir or self.DEFAULT_CACHE_DIR
         os.makedirs(self.cache_dir, exist_ok=True)
-        print(f"▶️CacheManager initialized. Cache directory is {self.cache_dir}")
+        print(f"\nCacheManager initialized. Cache directory is {self.cache_dir}")
 
     def _get_path(self, f_name: str) -> str:
         """Helper method to construct the full path for a cache file."""
@@ -38,9 +38,9 @@ class CacheHelper:
         try:
             with open(path, "wb") as out_f:
                 pickle.dump(obj, out_f)
-            print(f"✅Saved pickle to: {path}")
+            print(f"[DONE] Saved pickle to: {path}")
         except (IOError, pickle.PicklingError) as e:
-            print(f"‼️Error saving pickle file {path}: {e}")
+            print(f"!!! Error saving pickle file {path}: {e}")
 
     def load_pickle(self, f_name: str):
         """Loads an object from a pickle file. Returns None if the file doesn't exist."""
@@ -51,7 +51,7 @@ class CacheHelper:
             with open(path, "rb") as in_f:
                 return pickle.load(in_f)
         except (pickle.UnpicklingError, EOFError) as e:
-            print(f"‼️Error loading pickle file {path}: {e}")
+            print(f"!!! Error loading pickle file {path}: {e}")
             return None
 
 
@@ -149,21 +149,21 @@ class CacheManager(CacheHelper):
         if not handler:
             raise ValueError(f"Unknown entity type: {entity_type!r}")
 
-        print(f"\n▶️---Caching entity: '{entity_type}' ---")
+        print(f"\n>>> Caching entity: '{entity_type}'...")
         f_name = f"gmmad2_{entity_type}.pkl"
         existing_data = self.load_pickle(f_name) or {}
         if not isinstance(existing_data, dict):
-            print(f"‼️Warning: Data in {f_name} is not a dictionary. Overwriting.")
+            print(f"***Warning: Data in {f_name} is not a dictionary. Overwriting.")
             existing_data = {}
 
         kwargs["existing_data"] = existing_data
         new_data = handler(**kwargs)
         if new_data:
-            print(f"▶️Received {len(new_data)} new items to cache.")
+            print(f"-> Received {len(new_data)} new items to cache.")
             existing_data.update(new_data)
             self.save_pickle(existing_data, f_name)
         else:
-            print(f"❌No new data to cache for '{entity_type}'.")
+            print(f"!!! No new data to cache for '{entity_type}'.")
 
     def _cache_taxon_info(self, **kwargs):
         taxids = kwargs.get("taxids", [])
@@ -174,7 +174,7 @@ class CacheManager(CacheHelper):
         existing_data = self.load_pickle(f_name) or {}
         taxids_to_query = [tid for tid in taxids if tid not in existing_data]
         if not taxids_to_query:
-            print("✅All requested taxids are already in the cache.")
+            print("[DONE] All requested taxids are already in the cache.")
             return None
 
         taxon_info = self.ncbi_service.query_taxon_info_from_biothings(taxids=taxids_to_query)
@@ -196,7 +196,7 @@ class CacheManager(CacheHelper):
         Loads not-found taxids, finds their current IDs, queries for them,
         and updates the main taxon_info cache.
         """
-        print("\n⚙️---Updating cache with re-mapped taxids---")
+        print("\n>>> Updating cache with re-mapped taxids...")
 
         notfound_f_name = "gmmad2_taxon_info_notfound.pkl"
         main_cache_f_name = "gmmad2_taxon_info.pkl"
@@ -205,7 +205,7 @@ class CacheManager(CacheHelper):
 
         old_taxids_to_process = [tid for tid in taxid_notfound if tid not in main_taxon_info_cache]
         if not old_taxids_to_process:
-            print("✅All 'not found' taxids are already in the cache.")
+            print("[DONE] All 'not found' taxids are already in the cache.")
             return
 
         taxid_map = self.ncbi_service.get_taxid_mapping_from_ncbi_merged_dmp()
@@ -241,11 +241,11 @@ class CacheManager(CacheHelper):
                 new_taxon_info_to_add[new_id] = new_info
 
         if not info_to_add_from_remap and not new_taxon_info_to_add:
-            print("❌No new information to add to the cache.")
+            print("No new information to add to the cache.")
             return
 
         print(
-            f"▶️Adding {len(info_to_add_from_remap) + len(new_taxon_info_to_add)} new/remapped entries to the main cache."
+            f">>> Adding {len(info_to_add_from_remap) + len(new_taxon_info_to_add)} new/remapped entries to the main cache."
         )
         main_taxon_info_cache.update(info_to_add_from_remap)
         main_taxon_info_cache.update(new_taxon_info_to_add)
@@ -256,17 +256,17 @@ class CacheManager(CacheHelper):
         Loads the main taxon info cache, finds entries missing a description,
         queries for them, and saves the updated data back to the same file.
         """
-        print("\n⚙️---Updating taxon info with NCIT descriptions---")
+        print("\n>>> Updating taxon info with NCIT descriptions...")
 
         main_cache_f_name = "gmmad2_taxon_info.pkl"
         desc_cache_f_name = "gmmad2_ncit_descriptions.pkl"
 
         taxon_info_cache = self.load_pickle(main_cache_f_name)
         if not taxon_info_cache:
-            print(f"❌Main taxon info cache not found at '{main_cache_f_name}'. Cannot update.")
+            print(f"!!! Main taxon info cache not found at '{main_cache_f_name}'. Cannot update.")
             return
 
-        print(f"✅Loaded '{main_cache_f_name}' with {len(taxon_info_cache)} keys.")
+        print(f"-> Loaded '{main_cache_f_name}' with {len(taxon_info_cache)} keys.")
 
         desc_cache = self.load_pickle(desc_cache_f_name) or {}
         names_need_desc = set()
@@ -276,7 +276,7 @@ class CacheManager(CacheHelper):
                 names_need_desc.add(name)
 
         if not names_need_desc:
-            print("✅All taxon entries already have descriptions.")
+            print("[DONE] All taxon entries already have descriptions.")
             return
 
         names_to_query = sorted([name for name in names_need_desc if name not in desc_cache])
@@ -291,7 +291,7 @@ class CacheManager(CacheHelper):
                 desc_cache.update(new_descriptions)
                 self.save_pickle(desc_cache, desc_cache_f_name)
         else:
-            print("✅All needed descriptions were already in the local description cache.")
+            print("[DONE] All needed descriptions were already in the local description cache.")
 
         update_count = 0
         for taxid, info in taxon_info_cache.items():
@@ -314,7 +314,7 @@ class CacheManager(CacheHelper):
                     update_count += 1
         if update_count > 0:
             print(
-                f"⚙️Updated {update_count} entries in the main taxon info cache with descriptions."
+                f">>> Updated {update_count} entries in the main taxon info cache with descriptions..."
             )
             print(f"-> Saving '{main_cache_f_name}' with {len(taxon_info_cache)} keys.")
             self.save_pickle(taxon_info_cache, main_cache_f_name)
@@ -329,7 +329,7 @@ class CacheManager(CacheHelper):
         existing_data = self.load_pickle(f_name) or {}
         cids_to_query = [cid for cid in cids if cid not in existing_data]
         if not cids_to_query:
-            print("✅All requested pubchem_cids are already in the cache.")
+            print("[DONE] All requested pubchem_cids are already in the cache.")
             return
 
         pubchem_service = PubChemService()
@@ -344,7 +344,7 @@ class CacheManager(CacheHelper):
         self.save_pickle(existing_data, f_name)
 
     def _cache_pubchem_mw(self, **kwargs):
-        print("\n▶️---Caching PubChem Metabolite Physical Properties---")
+        print("\n>>> Caching PubChem Metabolite Physical Properties...")
         cids = kwargs.get("cids", [])
         if not cids:
             return
@@ -352,7 +352,7 @@ class CacheManager(CacheHelper):
         existing_data = self.load_pickle("gmmad2_pubchem_mw.pkl") or {}
         cids_to_query = [cid for cid in cids if cid not in existing_data]
         if not cids_to_query:
-            print("▶️All requested pubchem_cids are already in the cache.")
+            print("[DONE] All requested pubchem_cids are already in the cache.")
             return
 
         chem_property_service = ChemPropertyServices()
@@ -367,31 +367,31 @@ class CacheManager(CacheHelper):
         self.save_pickle(existing_data, "gmmad2_pubchem_mw.pkl")
 
     def _cache_bigg_mapping(self, **kwargs):
-        print("\n▶️---Caching BiGG Metabolite Mapping---")
+        print("\n>>> Caching BiGG Metabolite Mapping...")
         in_f = kwargs.get("downloads", "bigg_models_metabolites.txt")
         if not os.path.exists(in_f):
-            print(f"❌BiGG mapping file '{in_f}' does not exist. Skipping caching.")
+            print(f"!!! BiGG mapping file '{in_f}' does not exist. Skipping caching.")
             return
 
         bigg_parser = BiGGMapper()
         bigg_map = bigg_parser.get_bigg_metabolite_mapping(in_f=in_f)
 
         if not bigg_map:
-            print("❌No BiGG mapping data found.")
+            print("!!! No BiGG mapping data found.")
             return
 
         self.save_pickle(bigg_map, "gmmad2_bigg_metabolite_mapping.pkl")
-        print(f"✅BiGG mapping cached with {len(bigg_map)} entries.")
+        print(f"[DONE] BiGG mapping cached with {len(bigg_map)} entries.")
 
     def _cache_uniprot_info(self, **kwargs):
-        print("\n▶️---Caching UniProt Information---")
+        print("\n>>> Caching UniProt Information...")
         uniprot_ids = kwargs.get("uniprots", [])
         if not uniprot_ids:
             return
         existing_data = self.load_pickle(self.COMBINED_GENE_CACHE_F_NAME) or {}
         uids_to_query = [uid for uid in uniprot_ids if uid not in existing_data]
         if not uids_to_query:
-            print("✅All requested uniprot ids are already in the cache.")
+            print("[DONE] All requested uniprot ids are already in the cache.")
             return
 
         uniprot_service = UniProtService()
@@ -407,7 +407,7 @@ class CacheManager(CacheHelper):
         self.save_pickle(existing_data, self.COMBINED_GENE_CACHE_F_NAME)
 
     def _cache_gene_info(self, **kwargs):
-        print("\n▶️---Caching Gene Information---")
+        print("\n>>> Caching Gene Information...")
         gene_ids = kwargs.get("gene_ids", [])
         if not gene_ids:
             return
@@ -415,7 +415,7 @@ class CacheManager(CacheHelper):
         existing_data = self.load_pickle(self.COMBINED_GENE_CACHE_F_NAME) or {}
         gids_to_query = [gid for gid in gene_ids if gid not in existing_data]
         if not gids_to_query:
-            print("✅All requested gene ids are already in the cache.")
+            print("[DONE] All requested gene ids are already in the cache.")
             return
 
         go_service = GeneOntologyService()
@@ -429,7 +429,7 @@ class CacheManager(CacheHelper):
         self.save_pickle(existing_data, self.COMBINED_GENE_CACHE_F_NAME)
 
     def _cache_pubmed_metadata(self, **kwargs):
-        print("\n▶️---Caching PubMed Metadata---")
+        print("\n>>> Caching PubMed Metadata...")
         pmids = kwargs.get("pmids", [])
         if not pmids:
             return
@@ -437,7 +437,7 @@ class CacheManager(CacheHelper):
         existing_data = self.load_pickle("gmmad2_pubmed_metadata.pkl") or {}
         pmids_to_query = [pmid for pmid in pmids if pmid not in existing_data]
         if not pmids_to_query:
-            print("✅All requested PMIDs are already in the cache.")
+            print("[DONE] All requested PMIDs are already in the cache.")
             return
 
         pubmed_service = PubMedService()
