@@ -127,8 +127,12 @@ class GMMAD2Parser(CacheHelper):
 
     def _get_midi_association_node(self, line: list) -> dict:
         node = {
-            "predicate": "biolink:OrganismalEntityAsAModelOfDiseaseAssociation",
-            "type": "biolink:associated_with",
+            "category": "biolink:OrganismalEntityAsAModelOfDiseaseAssociation",
+            "predicate": "biolink:affects",
+            "primary_knowledge_source": "infores:GMrepo",
+            "aggregator_knowledge_source": "infores:GMMAD2",
+            "has_evidence": "ECO:0000221",  # high throughput nucleotide sequencing assay evidence
+            "agent_type": "biolink:manual_agent",
             "qualifier": line[17].lower(),
             "qualifier_ratio": float(line[16]) if line[16] else None,
             "disease_sample_size": int(line[6]) if line[6] else None,
@@ -141,9 +145,6 @@ class GMMAD2Parser(CacheHelper):
             "healthy_abundance_mean": float(line[13]) if line[13] else None,
             "healthy_abundance_median": float(line[14]) if line[14] else None,
             "healthy_abundance_sd": float(line[15]) if line[15] else None,
-            "primary_knowledge_source": "infores:GMrepo",
-            "aggregator_knowledge_source": "infores:GMMAD2",
-            "evidence_type": "ECO:0000221",  # high throughput nucleotide sequencing assay evidence
         }
         return self.parser_helpers.remove_empty_none_values(node)
 
@@ -161,12 +162,13 @@ class GMMAD2Parser(CacheHelper):
             else None
         )
         node = {
-            "predicate": "biolink:OrganismTaxonToChemicalEntityAssociation",
-            "type": "has_metabolic_interaction_with",
-            "association_habitat": habitat,
+            "category": "biolink:OrganismTaxonToChemicalEntityAssociation",
+            "predicate": "biolink:has_metabolic_interaction_with",
             "primary_knowledge_source": src,
             "aggregator_knowledge_source": "infores:GMMAD2",
-            "evidence_type": evidence_map.get(src, "ECO:0000000"),
+            "has_evidence": evidence_map.get(src, "ECO:0000000"),
+            "agent_type": "biolink:manual_agent",
+            "association_habitat": habitat,
         }
         return self.parser_helpers.remove_empty_none_values(node)
 
@@ -176,11 +178,13 @@ class GMMAD2Parser(CacheHelper):
             if line[9] and line[9] != "Unknown"
             else None
         )
+
         srcs = (
             [f"infores:{src.strip()}" for src in line[22].split(",")]
             if "," in line[22]
             else f"infores:{line[22].lower().strip()}"
         )
+
         evidence_map = {
             "infores:stitch": "ECO:0007669",  # computational evidence used in automatic assertion
             "infores:drugbank": "ECO:0000269",  # experimental evidence used in manual assertion
@@ -192,14 +196,28 @@ class GMMAD2Parser(CacheHelper):
         else:
             evidence_type = evidence_map.get(srcs, "ECO:0000000")
 
+        agent_map = {
+            "infores:stitch": "biolink:computational_model",
+            "infores:drugbank": "biolink:manual_agent",
+            "infores:gutMGene": "biolink:manual_agent",
+        }
+        if isinstance(srcs, list):
+            agents = [agent_map.get(s, "biolink:unknown_agent") for s in srcs]
+            agent_type = agents if len(agents) > 1 else agents[0]
+        else:
+            agent_type = agent_map.get(srcs, "biolink:unknown_agent")
+
+
         pmid_key = line[21]
         metadata = pmid_metadata.get(pmid_key) if pmid_key and pmid_key != "Not available" else None
 
         node = {
-            "id": "RO:0002434",
-            "predicate": "biolink:ChemicalGeneInteractionAssociation",
-            "type": "interacts_with",
-            "association_habitat": habitat,
+            "category": "biolink:ChemicalGeneInteractionAssociation",
+            "predicate": "biolink:interacts_with",
+            "primary_knowledge_source": srcs,
+            "aggregator_knowledge_source": "infores:GMMAD2",
+            "has_evidence": evidence_type,
+            "agent_type": agent_map.get(agent_type, "biolink:unknown_agent"),
             "score": float(line[19]) if line[19] and line[19] != "Not available" else None,
             "qualifier": (
                 "decrease"
@@ -210,16 +228,14 @@ class GMMAD2Parser(CacheHelper):
                 if line[20]
                 else None
             ),
-            "primary_knowledge_source": srcs,
-            "aggregator_knowledge_source": "infores:GMMAD2",
-            "evidence_type": evidence_type,
             "publications": {
                 "pmid": int(line[21]) if line[21] and line[21] != "Not available" else None,
-                "type": "biolink:Publication",
+                "category": "biolink:Publication",
                 "summary": metadata.get("summary") if metadata else None,
                 "name": metadata.get("name") if metadata else None,
                 "doi": metadata.get("doi") if metadata else None,
             },
+            "association_habitat": habitat,
         }
         return self.parser_helpers.remove_empty_none_values(node)
 
