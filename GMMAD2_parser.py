@@ -252,7 +252,9 @@ class GMMAD2Parser(CacheHelper):
             object_node = self._get_disease_node(line)
             association_node = self._get_midi_association_node(line)
             yield {
-                "_id": f"{self.parser_helpers.get_suffix(subject_node['id'])}_associated_with_{self.parser_helpers.get_suffix(object_node['id'])}",
+                "_id": f"{self.parser_helpers.get_suffix(subject_node['id'])}"
+                       f"_{association_node['predicate'].split[':'][1]}"
+                       f"_{self.parser_helpers.get_suffix(object_node['id'])}",
                 "association": association_node,
                 "object": object_node,
                 "subject": subject_node,
@@ -299,7 +301,9 @@ class GMMAD2Parser(CacheHelper):
             association_node = self._get_mime_association_node(line)
 
             yield {
-                "_id": f"{self.parser_helpers.get_suffix(subject_node['id'])}_has_metabolic_interaction_with_{self.parser_helpers.get_suffix(object_node['id'])}",
+                "_id": f"{self.parser_helpers.get_suffix(subject_node['id'])}"
+                       f"_{association_node['predicate'].split([':'][1])}"
+                       f"_{self.parser_helpers.get_suffix(object_node['id'])}",
                 "association": association_node,
                 "object": object_node,
                 "subject": subject_node,
@@ -342,7 +346,9 @@ class GMMAD2Parser(CacheHelper):
             association_node = self._get_mege_association_node(line, pmid_metadata)
 
             yield {
-                "_id": f"{self.parser_helpers.get_suffix(subject_node['id'])}_interacts_with_{self.parser_helpers.get_suffix(object_node['id'])}",
+                "_id": f"{self.parser_helpers.get_suffix(subject_node['id'])}"
+                       f"_{association_node['predicate'].split(':')[1]}"
+                       f"_{self.parser_helpers.get_suffix(object_node['id'])}",
                 "association": association_node,
                 "object": object_node,
                 "subject": subject_node,
