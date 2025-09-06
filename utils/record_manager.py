@@ -43,21 +43,21 @@ class RecordCacheManager(CacheHelper):
         total_processed = 0
 
         print("\n>>> Processing microbe-disease associations...")
-        with tqdm(desc="---Processing microbe-disease") as pbar:
+        with tqdm(desc="Processing microbe-disease") as pbar:
             for record in data_loader.load_microbe_disease_data():
                 deduplicator.process_record(record)
                 pbar.update(1)
                 total_processed += 1
 
         print("\n>>> Processing microbe-metabolite associations...")
-        with tqdm(desc="---Processing microbe-metabolite") as pbar:
+        with tqdm(desc="Processing microbe-metabolite") as pbar:
             for record in data_loader.load_microbe_metabolite_data():
                 deduplicator.process_record(record)
                 pbar.update(1)
                 total_processed += 1
 
         print("\n>>> Processing metabolite-gene associations...")
-        with tqdm(desc="---Processing metabolite-gene") as pbar:
+        with tqdm(desc="Processing metabolite-gene") as pbar:
             for record in data_loader.load_metabolite_gene_data():
                 deduplicator.process_record(record)
                 pbar.update(1)
