@@ -10,7 +10,7 @@ from .record_deduplicator import StreamDeduplicator
 class RecordCacheManager(CacheHelper):
     """Manages the creation of a combined cache from individual relationship files."""
 
-    COMBINED_FILENAME = "gmmad2_parsed_records"
+    COMBINED_FILENAME = f"gmmad2_parsed_records"
 
     def __init__(self, cache_dir=None):
         super().__init__(cache_dir)
