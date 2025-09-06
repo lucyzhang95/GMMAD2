@@ -400,5 +400,5 @@ if __name__ == "__main__":
 
     record_cache_manager = RecordCacheManager()
     record_cache_manager.create_deduplicated_jsonl_streamed(
-        data_loader=data_loader, use_memory_efficient=True
+        data_loader=data_loader, use_memory_efficient=False
     )
