@@ -217,7 +217,7 @@ class GMMAD2Parser(CacheHelper):
             "primary_knowledge_source": srcs,
             "aggregator_knowledge_source": "infores:GMMAD2",
             "has_evidence": evidence_type,
-            "agent_type": agent_map.get(agent_type, "biolink:unknown_agent"),
+            "agent_type": agent_type,
             "score": float(line[19]) if line[19] and line[19] != "Not available" else None,
             "qualifier": (
                 "decrease"
@@ -253,14 +253,14 @@ class GMMAD2Parser(CacheHelper):
             association_node = self._get_midi_association_node(line)
             yield {
                 "_id": f"{self.parser_helpers.get_suffix(subject_node['id'])}"
-                       f"_{association_node['predicate'].split[':'][1]}"
+                       f"_{association_node['predicate'].split(':')[1]}"
                        f"_{self.parser_helpers.get_suffix(object_node['id'])}",
                 "association": association_node,
                 "object": object_node,
                 "subject": subject_node,
             }
             rec_ct += 1
-        print(f"--- Finished Parsing Microbe-Disease. Generated {rec_ct} records. ---\n")
+        print(f"\n--- Finished Parsing Microbe-Disease. Generated {rec_ct} records. ---\n")
 
     def parse_microbe_metabolite(self) -> Iterator[dict]:
         print("\n--- Parsing Microbe-Metabolite Data ---")
@@ -302,14 +302,14 @@ class GMMAD2Parser(CacheHelper):
 
             yield {
                 "_id": f"{self.parser_helpers.get_suffix(subject_node['id'])}"
-                       f"_{association_node['predicate'].split([':'][1])}"
+                       f"_{association_node['predicate'].split(':')[1]}"
                        f"_{self.parser_helpers.get_suffix(object_node['id'])}",
                 "association": association_node,
                 "object": object_node,
                 "subject": subject_node,
             }
             rec_ct += 1
-        print(f"--- Finished Parsing Microbe-Metabolite. Generated {rec_ct} records. ---\n")
+        print(f"\n--- Finished Parsing Microbe-Metabolite. Generated {rec_ct} records. ---\n")
 
     def parse_metabolite_gene(self) -> Iterator[dict]:
         print("\n--- Parsing Metabolite-Gene Data ---")
@@ -354,7 +354,7 @@ class GMMAD2Parser(CacheHelper):
                 "subject": subject_node,
             }
             rec_ct += 1
-        print(f"--- Finished Parsing Metabolite-Gene. Generated {rec_ct} records. ---\n")
+        print(f"\n--- Finished Parsing Metabolite-Gene. Generated {rec_ct} records. ---\n")
 
 
 class DataLoader:
@@ -370,7 +370,7 @@ class DataLoader:
             cache_dir=cache_dir,
             downloads_dir=downloads_dir,
         )
-        print("🚀 DataLoader initialized.")
+        print(">>> DataLoader initialized.")
 
     def load_microbe_disease_data(self) -> Iterator[dict]:
         """Loads and yields data from the microbe-disease file."""
@@ -399,4 +399,4 @@ if __name__ == "__main__":
     all_gmmad2_recs = data_loader.load_entire_gmmad2_data()
 
     record_cache_manager = RecordCacheManager()
-    record_cache_manager.cache_combined_associations(data_loader=DataLoader())
+    record_cache_manager.create_deduplicated_jsonl(data_loader=DataLoader())
