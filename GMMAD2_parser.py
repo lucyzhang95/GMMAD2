@@ -207,7 +207,6 @@ class GMMAD2Parser(CacheHelper):
         else:
             agent_type = agent_map.get(srcs, "biolink:unknown_agent")
 
-
         pmid_key = line[21]
         metadata = pmid_metadata.get(pmid_key) if pmid_key and pmid_key != "Not available" else None
 
@@ -253,8 +252,8 @@ class GMMAD2Parser(CacheHelper):
             association_node = self._get_midi_association_node(line)
             yield {
                 "_id": f"{self.parser_helpers.get_suffix(subject_node['id'])}"
-                       f"_{association_node['predicate'].split(':')[1]}"
-                       f"_{self.parser_helpers.get_suffix(object_node['id'])}",
+                f"_{association_node['predicate'].split(':')[1]}"
+                f"_{self.parser_helpers.get_suffix(object_node['id'])}",
                 "association": association_node,
                 "object": object_node,
                 "subject": subject_node,
@@ -302,8 +301,8 @@ class GMMAD2Parser(CacheHelper):
 
             yield {
                 "_id": f"{self.parser_helpers.get_suffix(subject_node['id'])}"
-                       f"_{association_node['predicate'].split(':')[1]}"
-                       f"_{self.parser_helpers.get_suffix(object_node['id'])}",
+                f"_{association_node['predicate'].split(':')[1]}"
+                f"_{self.parser_helpers.get_suffix(object_node['id'])}",
                 "association": association_node,
                 "object": object_node,
                 "subject": subject_node,
@@ -347,8 +346,8 @@ class GMMAD2Parser(CacheHelper):
 
             yield {
                 "_id": f"{self.parser_helpers.get_suffix(subject_node['id'])}"
-                       f"_{association_node['predicate'].split(':')[1]}"
-                       f"_{self.parser_helpers.get_suffix(object_node['id'])}",
+                f"_{association_node['predicate'].split(':')[1]}"
+                f"_{self.parser_helpers.get_suffix(object_node['id'])}",
                 "association": association_node,
                 "object": object_node,
                 "subject": subject_node,
@@ -399,6 +398,4 @@ if __name__ == "__main__":
     all_gmmad2_recs = data_loader.load_entire_gmmad2_data()
 
     record_cache_manager = RecordCacheManager()
-    record_cache_manager.create_deduplicated_jsonl_streamed(
-        data_loader=data_loader, use_memory_efficient=False
-    )
+    record_cache_manager.create_deduplicated_jsonl_streamed(data_loader=data_loader)

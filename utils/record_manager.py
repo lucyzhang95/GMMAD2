@@ -1,5 +1,4 @@
 import json
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
@@ -8,7 +7,7 @@ from tqdm.auto import tqdm
 
 from utils.cache_manager import CacheHelper, RecordHelper
 
-from .record_deduplicator import MemoryEfficientDeduplicator, StreamDeduplicator
+from .record_deduplicator import StreamDeduplicator
 
 
 class RecordCacheManager(CacheHelper):
@@ -35,82 +34,43 @@ class RecordCacheManager(CacheHelper):
 
         return clean_record
 
-    # TODO: do not use use_memory_efficient=True...it takes lots of disk space and is slow
-    def create_deduplicated_jsonl_streamed(self, data_loader, use_memory_efficient=False):
+    def create_deduplicated_jsonl_streamed(self, data_loader):
         """
         Process all relationship data, deduplicate, and stream directly to a JSONL file.
 
         :param data_loader: The data loader instance
-        :param use_memory_efficient: If True, uses disk-based deduplication for very large datasets
         """
-        print(
-            f"\nCreating deduplicated GMMAD2 records as JSONL (streaming, memory_efficient={use_memory_efficient})..."
-        )
+        print("\nCreating deduplicated GMMAD2 records as JSONL...")
         print("=" * 50)
 
-        if use_memory_efficient:
-            deduplicator = MemoryEfficientDeduplicator(
-                temp_dir=os.path.join(self.record_helper.rec_dir, "temp_dedup")
-            )
-            print("Using memory-efficient deduplicator (disk-based)")
-        else:
-            deduplicator = StreamDeduplicator()
-            print("Using in-memory deduplicator")
+        deduplicator = StreamDeduplicator()
 
         output_path = Path(self.record_helper.rec_dir) / f"{self.COMBINED_FILENAME}.jsonl"
 
         total_processed = 0
         records_written = 0
-
         with open(output_path, "w", encoding="utf-8") as f:
-
             data_sources = [
                 ("microbe-disease", data_loader.load_microbe_disease_data),
                 ("microbe-metabolite", data_loader.load_microbe_metabolite_data),
                 ("metabolite-gene", data_loader.load_metabolite_gene_data),
             ]
-
             for source_name, data_method in data_sources:
                 print(f"\n>>> Processing {source_name} associations...")
 
                 with tqdm(desc=f"Processing {source_name}") as pbar:
                     for record in data_method():
                         total_processed += 1
-
-                        if use_memory_efficient:
+                        if not deduplicator.is_duplicate(record):
                             processed_record = deduplicator.process_record(record)
-                            if processed_record:
-                                standardized_record = self._standardize_record(processed_record)
-                                json_line = json.dumps(standardized_record, ensure_ascii=False)
-                                f.write(json_line + "\n")
-                                records_written += 1
+                            standardized_record = self._standardize_record(processed_record)
+                            json_line = json.dumps(standardized_record, ensure_ascii=False)
+                            f.write(json_line + "\n")
+                            records_written += 1
                         else:
-                            if not deduplicator.is_duplicate(record):
-                                processed_record = deduplicator.process_record(record)
-                                standardized_record = self._standardize_record(processed_record)
-                                json_line = json.dumps(standardized_record, ensure_ascii=False)
-                                f.write(json_line + "\n")
-                                records_written += 1
-                            else:
-                                deduplicator.process_record(record)
+                            deduplicator.process_record(record)
 
                         pbar.update(1)
-
-            if use_memory_efficient:
-                print("\n>>> Writing remaining deduplicated records...")
-                records_written = 0
-                f.seek(0)
-                f.truncate()
-
-                with tqdm(desc="Writing final records") as pbar:
-                    for record in deduplicator.get_all_records():
-                        standardized_record = self._standardize_record(record)
-                        json_line = json.dumps(standardized_record, ensure_ascii=False)
-                        f.write(json_line + "\n")
-                        records_written += 1
-                        pbar.update(1)
-
-                deduplicator.cleanup()
 
         duplicates_removed = total_processed - records_written
 
@@ -118,15 +78,14 @@ class RecordCacheManager(CacheHelper):
         print(f"-> Removed {duplicates_removed:,} duplicates")
         print(f"-> Final unique records: {records_written:,}")
         print(f"-> Output file: {output_path}")
-
         print("\n[DONE] Streaming JSONL export complete.")
-        print("Finished.\n")
+        print("\nExport Process Finished!\n")
 
         return str(output_path)
 
     def create_deduplicated_jsonl_streamed_no_dedup(self, data_loader):
         """Simplified streaming approach - processes records one by one without deduplication."""
-        print("\nCreating GMMAD2 records as JSONL (simple streaming, no deduplication)...")
+        print("\nCreating GMMAD2 records as JSONL (no deduplication applied)...")
         print("=" * 50)
 
         output_path = Path(self.record_helper.rec_dir) / f"{self.COMBINED_FILENAME}_no_dedup.jsonl"
@@ -158,4 +117,4 @@ class RecordCacheManager(CacheHelper):
 
     def create_deduplicated_jsonl(self, data_loader):
         """Loads all records into memory. Deduplicates and merges them, then writes to JSONL file."""
-        return self.create_deduplicated_jsonl_streamed(data_loader, use_memory_efficient=False)
+        return self.create_deduplicated_jsonl_streamed(data_loader)

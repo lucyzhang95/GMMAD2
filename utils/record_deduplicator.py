@@ -1,7 +1,6 @@
 import hashlib
 import json
-from pathlib import Path
-from typing import Dict, Iterator, Optional, Set
+from typing import Dict, Iterator
 
 
 def _merge_xrefs(target_xrefs: Dict, source_xrefs: Dict) -> None:
@@ -91,7 +90,7 @@ def _merge_original_names(target_node: Dict, source_node: Dict) -> None:
 
 def _merge_evidence(target_assoc: Dict, source_assoc: Dict) -> None:
     """
-    Merges evidence fields, preferring non-ECO:0000000 values.
+    Merges evidence fields, prioritizing non-ECO:0000000 values.
     If both records have different non-ECO:0000000 evidence, creates a list.
     """
     source_evidence = source_assoc.get("evidence")
@@ -123,7 +122,7 @@ def _merge_evidence(target_assoc: Dict, source_assoc: Dict) -> None:
 
 
 def _merge_primary_knowledge_source(target_assoc: Dict, source_assoc: Dict) -> None:
-    """Merges primary_knowledge_source fields into a list, avoiding duplicates."""
+    """Merges primary_knowledge_source fields into a list if the rest of the fields are the same."""
     source_pks = source_assoc.get("primary_knowledge_source")
     if not source_pks:
         return
@@ -178,120 +177,57 @@ def _create_fingerprint(record: Dict) -> str:
     return hashlib.md5(fingerprint_str.encode()).hexdigest()
 
 
-class MemoryEfficientDeduplicator:
-    """
-    A memory-efficient deduplicator that uses temporary files to minimize RAM usage.
-    Good for very large datasets that don't fit in memory.
-    """
+def _merge_records(existing_record: Dict, new_record: Dict) -> None:
+    """Merge new_record into existing_record."""
+    if "xrefs" in new_record.get("subject", {}):
+        _merge_xrefs(
+            existing_record.setdefault("subject", {}).setdefault("xrefs", {}),
+            new_record["subject"]["xrefs"],
+        )
 
-    def __init__(self, temp_dir: Optional[str] = None):
-        self.temp_dir = Path(temp_dir) if temp_dir else Path.cwd() / "temp_dedup"
-        self.temp_dir.mkdir(exist_ok=True)
-        self.seen_fingerprints: Set[str] = set()
-        self.temp_files: Dict[str, Path] = {}
+    if "original_name" in new_record.get("subject", {}):
+        _merge_original_names(
+            existing_record.setdefault("subject", {}),
+            new_record["subject"],
+        )
 
-    def process_record(self, record: Dict) -> Optional[Dict]:
-        """
-        Process a record. Returns the merged record if it's new or updated,
-        None if it's a duplicate with no new information.
-        """
-        fingerprint = _create_fingerprint(record)
+    if "xrefs" in new_record.get("object", {}):
+        _merge_xrefs(
+            existing_record.setdefault("object", {}).setdefault("xrefs", {}),
+            new_record["object"]["xrefs"],
+        )
 
-        if fingerprint in self.seen_fingerprints:
-            existing_record = self._load_temp_record(fingerprint)
-            if existing_record:
-                self._merge_records(existing_record, record)
-                self._save_temp_record(fingerprint, existing_record)
-                return existing_record
-        else:
-            self.seen_fingerprints.add(fingerprint)
-            self._save_temp_record(fingerprint, record)
-            return record
+    if "original_name" in new_record.get("object", {}):
+        _merge_original_names(
+            existing_record.setdefault("object", {}),
+            new_record["object"],
+        )
 
-        return None
+    if new_record.get("association"):
+        existing_assoc = existing_record.setdefault("association", {})
+        source_assoc = new_record["association"]
 
-    def _merge_records(self, existing_record: Dict, new_record: Dict) -> None:
-        """Merge new_record into existing_record."""
-        if "xrefs" in new_record.get("subject", {}):
-            _merge_xrefs(
-                existing_record.setdefault("subject", {}).setdefault("xrefs", {}),
-                new_record["subject"]["xrefs"],
-            )
+        if "publications" in source_assoc:
+            _merge_publications(existing_assoc, source_assoc)
 
-        if "original_name" in new_record.get("subject", {}):
-            _merge_original_names(
-                existing_record.setdefault("subject", {}),
-                new_record["subject"],
-            )
+        if "primary_knowledge_source" in source_assoc:
+            _merge_primary_knowledge_source(existing_assoc, source_assoc)
 
-        if "xrefs" in new_record.get("object", {}):
-            _merge_xrefs(
-                existing_record.setdefault("object", {}).setdefault("xrefs", {}),
-                new_record["object"]["xrefs"],
-            )
-
-        if "original_name" in new_record.get("object", {}):
-            _merge_original_names(
-                existing_record.setdefault("object", {}),
-                new_record["object"],
-            )
-
-        if new_record.get("association"):
-            existing_assoc = existing_record.setdefault("association", {})
-            source_assoc = new_record["association"]
-
-            if "publications" in source_assoc:
-                _merge_publications(existing_assoc, source_assoc)
-
-            if "primary_knowledge_source" in source_assoc:
-                _merge_primary_knowledge_source(existing_assoc, source_assoc)
-
-            if "evidence" in source_assoc:
-                _merge_evidence(existing_assoc, source_assoc)
-
-    def _save_temp_record(self, fingerprint: str, record: Dict) -> None:
-        """Save a record to temporary file."""
-        temp_file = self.temp_dir / f"{fingerprint}.json"
-        self.temp_files[fingerprint] = temp_file
-        with open(temp_file, "w") as f:
-            json.dump(record, f)
-
-    def _load_temp_record(self, fingerprint: str) -> Optional[Dict]:
-        """Load a record from temporary file."""
-        temp_file = self.temp_files.get(fingerprint)
-        if temp_file and temp_file.exists():
-            with open(temp_file, "r") as f:
-                return json.load(f)
-        return None
-
-    def get_all_records(self) -> Iterator[Dict]:
-        """Get all processed records."""
-        for fingerprint in self.seen_fingerprints:
-            record = self._load_temp_record(fingerprint)
-            if record:
-                yield record
-
-    def cleanup(self) -> None:
-        """Clean up temporary files."""
-        for temp_file in self.temp_files.values():
-            if temp_file.exists():
-                temp_file.unlink()
-        if self.temp_dir.exists():
-            self.temp_dir.rmdir()
+        if "evidence" in source_assoc:
+            _merge_evidence(existing_assoc, source_assoc)
 
 
 class StreamDeduplicator:
     """
-    Original in-memory deduplicator for smaller datasets.
-    Processes a stream of records to remove duplicates and merge records
-    based on predefined rules.
+    In-memory deduplicator.
+    Processes a stream of records to remove duplicates and merge records based on the above rules.
     """
 
     def __init__(self):
         self.processed_records: Dict[str, Dict] = {}
 
     def is_duplicate(self, record: Dict) -> bool:
-        """Check if record is a duplicate without processing it."""
+        """Check if the record is a duplicate without processing it."""
         fingerprint = _create_fingerprint(record)
         return fingerprint in self.processed_records
 
@@ -307,51 +243,10 @@ class StreamDeduplicator:
             self.processed_records[fingerprint] = record.copy()
         else:
             existing_record = self.processed_records[fingerprint]
-            self._merge_records(existing_record, record)
+            _merge_records(existing_record, record)
 
         return self.processed_records[fingerprint]
 
-    def _merge_records(self, existing_record: Dict, new_record: Dict) -> None:
-        """Merge new_record into existing_record."""
-        if "xrefs" in new_record.get("subject", {}):
-            _merge_xrefs(
-                existing_record.setdefault("subject", {}).setdefault("xrefs", {}),
-                new_record["subject"]["xrefs"],
-            )
-
-        if "original_name" in new_record.get("subject", {}):
-            _merge_original_names(
-                existing_record.setdefault("subject", {}),
-                new_record["subject"],
-            )
-
-        if "xrefs" in new_record.get("object", {}):
-            _merge_xrefs(
-                existing_record.setdefault("object", {}).setdefault("xrefs", {}),
-                new_record["object"]["xrefs"],
-            )
-
-        if "original_name" in new_record.get("object", {}):
-            _merge_original_names(
-                existing_record.setdefault("object", {}),
-                new_record["object"],
-            )
-
-        if new_record.get("association"):
-            existing_assoc = existing_record.setdefault("association", {})
-            source_assoc = new_record["association"]
-
-            if "publications" in source_assoc:
-                _merge_publications(existing_assoc, source_assoc)
-
-            if "primary_knowledge_source" in source_assoc:
-                _merge_primary_knowledge_source(existing_assoc, source_assoc)
-
-            if "evidence" in source_assoc:
-                _merge_evidence(existing_assoc, source_assoc)
-
     def get_results(self) -> Iterator[Dict]:
-        """
-        Returns an iterator for the final, deduplicated and merged records.
-        """
+        """Returns an iterator for the final, deduplicated and merged records."""
         yield from self.processed_records.values()
