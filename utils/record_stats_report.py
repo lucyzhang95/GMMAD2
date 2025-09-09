@@ -315,7 +315,7 @@ class GMMAD2RecordStatsReporter:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
         sampled_export_path = os.path.join(
-            self.report_dir, f"{timestamp}_gmmad2_sampled_duplicate_records.json"
+            self.report_dir, f"gmmad2_sampled_duplicate_records_{timestamp}.json"
         )
         sampled_export_data = {
             "metadata": {
@@ -331,7 +331,7 @@ class GMMAD2RecordStatsReporter:
 
         if len(all_duplicates) < 10000:
             all_export_path = os.path.join(
-                self.report_dir, f"{timestamp}_gmmad2_all_duplicate_records.json"
+                self.report_dir, f"gmmad2_all_duplicate_records_{timestamp}.json"
             )
             all_export_data = {
                 "metadata": {
@@ -521,7 +521,7 @@ class GMMAD2RecordStatsReporter:
         """Save the statistics report to JSON file."""
         if output_filename is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output_filename = f"{timestamp}_gmmad2_comprehensive_stats.json"
+            output_filename = f"gmmad2_comprehensive_stats_{timestamp}.json"
 
         report_path = os.path.join(self.report_dir, output_filename)
 
