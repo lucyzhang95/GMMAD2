@@ -227,13 +227,15 @@ class GMMAD2Parser(CacheHelper):
                 if line[20]
                 else None
             ),
-            "publications": {
+            "publication": {
                 "pmid": int(line[21]) if line[21] and line[21] != "Not available" else None,
                 "category": "biolink:Publication",
                 "summary": metadata.get("summary") if metadata else None,
                 "name": metadata.get("name") if metadata else None,
                 "doi": metadata.get("doi") if metadata else None,
-            },
+            }
+            if line[21] and line[21] != "Not available"
+            else None,
             "association_habitat": habitat,
         }
         return self.parser_helpers.remove_empty_none_values(node)
