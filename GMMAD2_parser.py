@@ -265,6 +265,15 @@ class GMMAD2Parser(CacheHelper):
 
     def parse_microbe_metabolite(self) -> Iterator[dict]:
         print("\n>>> Parsing Microbe-Metabolite Data...")
+        required_cache = [
+            "gmmad2_pubchem_descriptions.pkl",
+            "gmmad2_pubchem_mw.pkl",
+            "gmmad2_bigg_metabolite_mapping.pkl",
+        ]
+        for cache in required_cache:
+            if not os.path.exists(self._get_path(cache)):
+                self.cache_pipeline.run_cache_pipeline()
+
         taxon_cache = self.load_pickle("gmmad2_taxon_info.pkl")
         pubchem_desc = self.load_pickle("gmmad2_pubchem_descriptions.pkl")
         pubchem_mw = self.load_pickle("gmmad2_pubchem_mw.pkl")
@@ -314,6 +323,17 @@ class GMMAD2Parser(CacheHelper):
 
     def parse_metabolite_gene(self) -> Iterator[dict]:
         print("\n>>> Parsing Metabolite-Gene Data...")
+        required_cache = [
+            "gmmad2_pubchem_descriptions.pkl",
+            "gmmad2_pubchem_mw.pkl",
+            "gmmad2_protein_gene_combined_info.pkl",
+            "gmmad2_bigg_metabolite_mapping.pkl",
+            "gmmad2_pubmed_metadata.pkl",
+        ]
+        for cache in required_cache:
+            if not os.path.exists(self._get_path(cache)):
+                self.cache_pipeline.run_cache_pipeline()
+
         pubchem_descr = self.load_pickle("gmmad2_pubchem_descriptions.pkl")
         pubchem_mw = self.load_pickle("gmmad2_pubchem_mw.pkl")
         gene_info = self.load_pickle("gmmad2_protein_gene_combined_info.pkl")
