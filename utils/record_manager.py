@@ -7,7 +7,7 @@ from tqdm.auto import tqdm
 
 from utils.cache_manager import CacheHelper, RecordHelper
 
-from .record_deduplicator import StreamDeduplicator
+from utils.record_deduplicator import StreamDeduplicator
 
 
 class RecordCacheManager(CacheHelper):
