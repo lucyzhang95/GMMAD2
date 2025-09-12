@@ -513,7 +513,7 @@ class PubMedService:
                 result[pmid] = {
                     "name": title,
                     "summary": f"{abstract} [abstract]",
-                    "doi": doi,
+                    "doi": f"doi:{doi}",
                 }
             except Exception as e:
                 print(f"Failed to parse article: {e}")
