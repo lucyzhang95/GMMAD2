@@ -4,8 +4,8 @@ import pickle
 from datetime import datetime
 from typing import Any, Dict, List
 
-from .ontology_mapper import BiGGMapper
-from .ontology_services import (
+from utils.ontology_mapper import BiGGMapper
+from utils.ontology_services import (
     ChemPropertyServices,
     GeneOntologyService,
     NCBITaxonomyService,
@@ -14,7 +14,7 @@ from .ontology_services import (
     PubMedService,
     UniProtService,
 )
-from .parser_helper import ParserHelper
+from utils.parser_helper import ParserHelper
 
 
 class CacheHelper:

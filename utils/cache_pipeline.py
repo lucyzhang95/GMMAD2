@@ -4,7 +4,6 @@ from utils.cache_manager import CacheManager
 from utils.ontology_mapper import BiGGMapper
 from utils.reader import CSVReader
 
-
 class DataCachePipeline:
     def __init__(self, cache_dir="cache", downloads_dir="downloads"):
         self.downloads_dir = downloads_dir
