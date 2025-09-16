@@ -71,7 +71,7 @@ class ParserHelper:
                 "PUBCHEM.COMPOUND": "pubchem_cid",
                 "DRUGBANK": "drugbank",
                 "HMDB": "hmdb",
-                "SMILES": "smiles",
+                "smiles": "smiles",
                 "BIGG.METABOLITE": "bigg",
                 "KEGG.COMPOUND": "kegg",
                 "KEGG.GLYCAN": "kegg",
