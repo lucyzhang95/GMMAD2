@@ -293,7 +293,7 @@ class GMMAD2Parser(CacheHelper):
             mime_id_hierarchy = [
                 (line[6], "PUBCHEM.COMPOUND"),
                 (line[8], "KEGG"),
-                (line[18], "SMILES"),
+                (line[18], "smiles"),
                 (line[19], "HMDB"),
                 (bigg_mapping.get(line[5].lower()), "BIGG.METABOLITE"),
             ]
@@ -346,7 +346,7 @@ class GMMAD2Parser(CacheHelper):
                 (line[3], "PUBCHEM.COMPOUND"),
                 (line[7], "DRUGBANK"),
                 (line[5], "KEGG"),
-                (line[10], "SMILES"),
+                (line[10], "smiles"),
                 (line[6], "HMDB"),
                 (bigg_mapping.get(line[2].lower()), "BIGG.METABOLITE"),
             ]
